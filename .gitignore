@@ -1,0 +1,16 @@
+# target files
+target/
+test/
+
+# Pycharm files
+.idea
+*.iml
+
+# virtual environment files
+venv/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+.idea
