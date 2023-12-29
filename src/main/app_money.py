@@ -20,7 +20,7 @@ db_name = 'money'
 client = client_mongo[db_name]
 table = client['LunchMoney']
 
-external_stylesheets = ['assets/spearming.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
+external_stylesheets = ['assets/spearmint.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 
@@ -32,9 +32,14 @@ def zero_params_dict():
     """
     # params = ['version', 'node', 'channel', 'data length', 'encodingScheme', 'field_filter', 'time_filter',
     #           'phase0', 'dutyCycle0', 'dutyCycle1', 'coeff1', 'ofdmSpace', 'user_data', 'start_date', 'end_date']
-    params = ['field_filter', 'time_filter', 'start_date', 'end_date', 'phase']
+    params = ['field_filter', 'time_filter', 'phase', 'start_date', 'end_date']
+    params_dict = dict.fromkeys(params, 0)
+    today = date.today()
+    start_of_month = date(today.year, today.month, 1)
+    params_dict['end_date'] = datetime.strftime(today, '%Y-%m-%d')
+    params_dict['start_date'] = datetime.strftime(start_of_month, '%Y-%m-%d')
 
-    return dict.fromkeys(params, 0)
+    return params_dict
 
 
 def make_plot_object(conf_dict):
@@ -112,11 +117,16 @@ def make_table(conf_dict):
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
-        transactions = pd.DataFrame(table.find())
+        transactions = pd.DataFrame([table.find_one()])
     transactions = transactions.drop(columns=['_id', 'original_name', 'transaction_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
     columns = [{"name": i, "id": i} for i in transactions.columns]
+    # TODO Make table columns be hidden
+    # hidden_columns = ['_id', 'original_name', 'transaction_id', 'currency']
+    # for col in columns:
+    #     if col['name'] in hidden_columns:
+    #         col['hidden'] = 'true'
     return {'data': data, 'columns': columns}
 
 
@@ -139,12 +149,10 @@ colors = {
 # Initialize parameters
 current_config_dict = zero_params_dict()
 
-# Make initial sine plot
+# Make initial plot
 fig = make_plot_object(current_config_dict)
 
-# df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/solar.csv')
-# data = df.to_dict('records')
-# tab = {'data': data}
+# Make initial table
 tab = make_table(current_config_dict)
 
 # Layout app window
@@ -164,7 +172,7 @@ app.layout = html.Div(
         html.Div(id="input-params", style={'width': '24%', 'float': 'left'},
                  children=[
                      dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
-                                       children=["Filters:"]),
+                                       children=["Filter Configurations"], id='filter-text'),
                               html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
                                        children=["Sort By"]),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
@@ -197,6 +205,15 @@ app.layout = html.Div(
                                                  ],
                                        ),
                               ]),
+                     html.Div(style={'display': 'inline-block'},
+                              children=[dcc.DatePickerRange(
+                                  id='date-range',
+                                  min_date_allowed=date(2000, 1, 1),
+                                  max_date_allowed=date.today(),
+                                  initial_visible_month=date.today(),
+                                  end_date=date.today()
+                              )]),
+
                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
                                        children=["Phase (deg)"]),
                               html.Div(style={'width': '50%', 'display': 'inline-block'},
@@ -209,17 +226,6 @@ app.layout = html.Div(
                               ]),
                      html.Div(style={'display': 'inline-block', 'padding': '15px 20px 0px 20px'},
                               children=[html.Button(id='reset-button', n_clicks=0, children=['Reset Parameters'])]),
-
-                     html.Div(style={'display': 'inline-block', 'padding': '0px 0px 0px 0px'},
-                              # style={'display': 'inline-block', 'padding': '0px 0px 0px 0px'}}
-                              children=[dcc.DatePickerRange(
-                                  id='date-range',
-                                  min_date_allowed=date(1995, 8, 5),
-                                  max_date_allowed=date.today(),
-                                  initial_visible_month=date.today(),
-                                  end_date=date.today()
-                              )]),
-
                      html.Div('Configuration file path', style={'padding': '30px 20px 0px 20px'}, ),
                      html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '5px 20px'},
                               children=[dcc.Input(id='config-input', type='text', style={'width': '100%'},
@@ -245,11 +251,15 @@ app.layout = html.Div(
                 dcc.Tab(label="Transactions", children=[
                     html.Div(style={'width': '99%', 'height': '600px', 'float': 'left', 'background-color': colors.get('blue')},
                              children=[dash_table.DataTable(id='transactions-table',
-                                                            data=tab.get('data'),  # df.to_dict('records'), # tab.get('data'),
-                                                            columns=tab.get('columns'),  # [{"name": i, "id": i} for i in df.columns],
+                                                            data=tab.get('data'),
+                                                            columns=tab.get('columns'),
                                                             style_data_conditional=DATA_TABLE_STYLE.get("style_data_conditional"),
-                                                            style_header=DATA_TABLE_STYLE.get("style_header"), ),
-                                       ])
+                                                            style_header=DATA_TABLE_STYLE.get("style_header"),
+                                                            style_cell={'minWidth': '5px', 'width': '50px', 'maxWidth': '200px',
+                                                                        'overflow': 'hidden', 'textOverflow': 'ellipsis'},
+                                                            editable=True,
+                                                            ),
+                                       html.Div(style={'height': '10px'}, id='blank-space')])
                 ]),
                 dcc.Tab(label="Budget", children='TODO: Budget'),
             ]),
@@ -337,9 +347,9 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
     new_params = curr_params
 
     if curr_params['time_filter'] == '5':
-        date_range_style = {'display': 'inline-block', 'padding': '15px 20px 0px 20px'}
+        date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     else:
-        date_range_style = {'display': 'inline-block', 'padding': '0px 0px 0px 0px'}
+        date_range_style = {'display': 'none'}
 
     # if one of the parameters, change them in the current dict
     if 'input' in trigger:
@@ -355,19 +365,34 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
             today = date.today()
             new_params['start_date'] = date(today.year, today.month, 1)
             new_params['end_date'] = date.today()
-            date_range_style = {'display': 'inline-block', 'padding': '0px 0px 0px 0px'}
+            date_range_style = {'display': 'none'}
         elif time_filter == '1':  # Last Month
             today = date.today()
             new_params['end_date'] = date(today.year, today.month, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year,  new_params['end_date'].month, 1)
-            date_range_style = {'display': 'inline-block', 'padding': '0px 0px 0px 0px'}
+            date_range_style = {'display': 'none'}
+        elif time_filter == '4':  # All Time
+            new_params['end_date'] = date.today()
+            new_params['start_date'] = date(2000, 1, 1)
+            date_range_style = {'display': 'none'}
         elif time_filter == '5':
-            date_range_style = {'display': 'inline-block', 'padding': '15px 20px 0px 20px'}
+            date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
 
     return new_params, new_params['field_filter'], date_range_style
+
+
+# @app.callback(
+#     Output('filter-text', 'value'),
+#     Input('transactions-table', 'data')
+# )
+# def loading_data(data):
+#     D = pd.DataFrame(data)
+#     # D.to_sql('test_backend', if_exists='replace')
+#
+#     return 'updated'
 
 
 @app.callback(
