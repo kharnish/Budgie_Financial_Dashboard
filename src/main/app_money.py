@@ -12,13 +12,12 @@ import numpy as np
 from scipy import signal
 import pymongo
 from datetime import date, datetime, timedelta
+from dotenv import load_dotenv
 
-url = 'mongodb://132.250.84.58:27017/'
-client_mongo = pymongo.MongoClient(url)
-
-db_name = 'money'
-client = client_mongo[db_name]
-table = client['LunchMoney']
+load_dotenv()
+client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
+client = client_mongo[os.getenv("MONGO_DB")]
+table = client[os.getenv("MONGO_CLIENT")]
 
 external_stylesheets = ['assets/spearmint.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -118,16 +117,22 @@ def make_table(conf_dict):
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
         transactions = pd.DataFrame([table.find_one()])
-    transactions = transactions.drop(columns=['_id', 'original_name', 'transaction_id'])
+    if len(transactions) == 0:
+        return {'data': [{'date': 'Na', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
+                          'currency': 'USD', 'original_description': 'No Available Data', 'account': 'Na', 'notes': ''}],
+                'columns': [{'name': 'date', 'id': 'date'}, {'name': 'category', 'id': 'category'},
+                            {'name': 'description', 'id': 'description'}, {'name': 'amount', 'id': 'amount'},
+                            {'name': 'currency', 'id': 'currency'}, {'name': 'original_description', 'id': 'original_description'},
+                            {'name': 'account', 'id': 'account'}, {'name': 'notes', 'id': 'notes'}]
+                }
+    transactions = transactions.drop(columns=['_id'])
+    # transactions = transactions.drop(columns=['_id', 'original_name', 'transaction_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
     columns = [{"name": i, "id": i} for i in transactions.columns]
     # TODO Make table columns be hidden
-    # hidden_columns = ['_id', 'original_name', 'transaction_id', 'currency']
-    # for col in columns:
-    #     if col['name'] in hidden_columns:
-    #         col['hidden'] = 'true'
-    return {'data': data, 'columns': columns}
+    hidden_columns = ['original_name', 'transaction_id', 'currency']
+    return {'data': data, 'columns': columns, 'hidden_columns': hidden_columns}
 
 
 colors = {
@@ -172,7 +177,7 @@ app.layout = html.Div(
         html.Div(id="input-params", style={'width': '24%', 'float': 'left'},
                  children=[
                      dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
-                                       children=["Filter Configurations"], id='filter-text'),
+                                       children=["Filter Configurations"]),
                               html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
                                        children=["Sort By"]),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
@@ -224,9 +229,6 @@ app.layout = html.Div(
                                            value=current_config_dict['phase'], min=0, max=360, )
                                        ]),
                               ]),
-                     html.Div(style={'display': 'inline-block', 'padding': '15px 20px 0px 20px'},
-                              children=[html.Button(id='reset-button', n_clicks=0, children=['Reset Parameters'])]),
-                     html.Div('Configuration file path', style={'padding': '30px 20px 0px 20px'}, ),
                      html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '5px 20px'},
                               children=[dcc.Input(id='config-input', type='text', style={'width': '100%'},
                                                   placeholder='Path to config file')], ),
@@ -258,6 +260,7 @@ app.layout = html.Div(
                                                             style_cell={'minWidth': '5px', 'width': '50px', 'maxWidth': '200px',
                                                                         'overflow': 'hidden', 'textOverflow': 'ellipsis'},
                                                             editable=True,
+                                                            hidden_columns=tab.get('hidden_columns'),
                                                             ),
                                        html.Div(style={'height': '10px'}, id='blank-space')])
                 ]),
@@ -265,50 +268,15 @@ app.layout = html.Div(
             ]),
     ]
 )
+
+
 @app.callback(
     Output('config-input-text', 'children'),
     Output('original-config-memory', 'data'),
     Input('config-input', 'value'),
 )
 def parse_config_path(path):
-    """Determines if path to file is valid (i.e. has all parameters, and all parameters are a number), and if so,
-    parses out parameters to a dictionary.
-
-    Args:
-        path: Path to input config file.
-
-    Returns:
-        String updated for textbox.
-        Dataframe of current configuration parameters.
-    """
-    if path is not None:
-        # check to ensure config file actually exists
-        if os.path.isfile(path):
-            config = pd.read_csv(path, delimiter=' = ', header=None, engine='python')
-            # check if 'version = ' is written in config file and if not, add it
-            if config.iloc[0][0] != config.iloc[0][0]:
-                config = pd.read_csv(path, delimiter=' = ', header=None, skiprows=1, index_col=False, engine='python')
-                with open(path) as f:
-                    version_name = f.readline()
-                config = config.append([['version', version_name[:-2]]])
-            config = config.set_index(config.iloc[:][0].values)
-            # check to ensure all parameter values are numbers, except the version
-            for r, c in config.iterrows():
-                if r != 'version':
-                    try:
-                        c[1] = float(c[1])
-                    except ValueError:
-                        return ' Ensure config file has all required parameters.', zero_params_dict()
-            config_dict = config[1].to_dict()
-            # check to ensure all parameters are included
-            if config_dict.keys() == zero_params_dict().keys():
-                return '', config_dict
-            else:
-                return ' Ensure config file has all required parameters.', zero_params_dict()
-        else:
-            return ' Enter a valid file path.', zero_params_dict()
-    else:
-        return '', zero_params_dict()
+    return '', zero_params_dict()
 
 
 @app.callback(
@@ -321,19 +289,18 @@ def parse_config_path(path):
     Input('original-config-memory', 'data'),
     Input('current-config-memory', 'data'),
     Input('phi-input', 'value'),
-    Input('reset-button', 'n_clicks'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
 )
-def update_plot_parameters(field_filter, time_filter, og_params, curr_params, phase, clicks, start_date, end_date):
+def update_plot_parameters(field_filter, time_filter, og_params, curr_params, phase, start_date, end_date):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
-        waveform: Waveform to display.
+        field_filter: Category filter
+        time_filter: Time window filter
         og_params: Dictionary of original parameters from loaded config file.
         curr_params: Dictionary of current parameters.
         phase: Phase of the waveform (deg).
-        clicks: Number of times the reset params button has been clicked.
 
     Returns: Current parameters for specified bit.
 
@@ -357,8 +324,6 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
             new_params['phase'] = phase
     elif trigger == 'field-dropdown.value':
         new_params['field_filter'] = int(field_filter)
-    elif trigger == 'reset-button.n_clicks':
-        new_params = og_params
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
         if time_filter == '0':  # This Month
@@ -369,7 +334,7 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
         elif time_filter == '1':  # Last Month
             today = date.today()
             new_params['end_date'] = date(today.year, today.month, 1) - timedelta(days=1)
-            new_params['start_date'] = date(new_params['end_date'].year,  new_params['end_date'].month, 1)
+            new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1)
             date_range_style = {'display': 'none'}
         elif time_filter == '4':  # All Time
             new_params['end_date'] = date.today()
