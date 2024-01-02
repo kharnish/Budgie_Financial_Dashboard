@@ -5,7 +5,7 @@ Date:  02 May 2021
 import os
 import dash
 import dash_bootstrap_components as dbc
-from dash import Dash, dcc, html, Input, Output, callback, dash_table
+from dash import Dash, dcc, html, Input, Output, callback
 import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
@@ -13,6 +13,8 @@ from scipy import signal
 import pymongo
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
+import dash_ag_grid as dag
+
 
 load_dotenv()
 client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
@@ -29,8 +31,6 @@ def zero_params_dict():
     Returns: Dictionary with all parameters set to 0.
 
     """
-    # params = ['version', 'node', 'channel', 'data length', 'encodingScheme', 'field_filter', 'time_filter',
-    #           'phase0', 'dutyCycle0', 'dutyCycle1', 'coeff1', 'ofdmSpace', 'user_data', 'start_date', 'end_date']
     params = ['field_filter', 'time_filter', 'phase', 'start_date', 'end_date']
     params_dict = dict.fromkeys(params, 0)
     today = date.today()
@@ -91,25 +91,6 @@ def make_plot_object(conf_dict):
     return fig_obj
 
 
-DATA_TABLE_STYLE = {
-    "style_data_conditional": [
-        {"if": {"column_id": "Finish"}, "backgroundColor": "#eee"}
-    ],
-    "style_header": {
-        "color": "white",
-        "backgroundColor": "#799DBF",
-        "fontWeight": "bold",
-    },
-    "css": [
-        {
-            "selector": ".Select-value",
-            "rule": "padding-right: 22px",
-        },  # makes space for the dropdown caret
-        {"selector": ".dropdown", "rule": "position: static"},  # makes dropdown visible
-    ],
-}
-
-
 def make_table(conf_dict):
     if conf_dict['start_date'] != 0:
         transactions = pd.DataFrame(table.find({'date': {
@@ -120,16 +101,13 @@ def make_table(conf_dict):
     if len(transactions) == 0:
         return {'data': [{'date': 'Na', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
                           'currency': 'USD', 'original_description': 'No Available Data', 'account': 'Na', 'notes': ''}],
-                'columns': [{'name': 'date', 'id': 'date'}, {'name': 'category', 'id': 'category'},
-                            {'name': 'description', 'id': 'description'}, {'name': 'amount', 'id': 'amount'},
-                            {'name': 'currency', 'id': 'currency'}, {'name': 'original_description', 'id': 'original_description'},
-                            {'name': 'account', 'id': 'account'}, {'name': 'notes', 'id': 'notes'}]
+                'columns': [{'field': 'date'}, {'field': 'category'}, {'field': 'description'}, {'field': 'amount'}, {'field': 'currency'},
+                            {'field': 'original_description'}, {'field': 'account'}, {'field': 'notes'}]
                 }
     transactions = transactions.drop(columns=['_id'])
-    # transactions = transactions.drop(columns=['_id', 'original_name', 'transaction_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
-    columns = [{"name": i, "id": i} for i in transactions.columns]
+    columns = [{"field": i, 'filter': True} for i in transactions.columns]
     # TODO Make table columns be hidden
     hidden_columns = ['original_name', 'transaction_id', 'currency']
     return {'data': data, 'columns': columns, 'hidden_columns': hidden_columns}
@@ -196,14 +174,14 @@ app.layout = html.Div(
                                        children=['Time Window']),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
-                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'],
+                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'],  # maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
                                                               style={'background-color': '#8A94AA'},
                                                               options=[
                                                                   {'label': 'This Month', 'value': '0'},
                                                                   {'label': 'Last Month', 'value': '1'},
-                                                                  # {'label': 'This Year', 'value': '2'},
-                                                                  # {'label': 'Last Year', 'value': '3'},
+                                                                  {'label': 'This Year', 'value': '2'},
+                                                                  {'label': 'Last Year', 'value': '3'},
                                                                   {'label': 'All Time', 'value': '4'},
                                                                   {'label': 'Custom', 'value': '5'},
                                                               ], )
@@ -241,30 +219,25 @@ app.layout = html.Div(
                             style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}, ),
                      html.Div('', style={'padding': '0px 20px 10px 20px'}, ),
                  ]),
-        dcc.Tabs(
-            [
-                dcc.Tab(label="Trends", children=[
+
+        dcc.Tabs(id='selection_tabs', value='Trends', children=[
+                dcc.Tab(label="Trends", value='Trends', children=[
                     html.Div(id="trends-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
                              children=[
                                  dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
                                            id='money-graph', figure=fig),
                              ]),
                 ]),
-                dcc.Tab(label="Transactions", children=[
+                dcc.Tab(label="Transactions", value='Transactions', children=[
                     html.Div(style={'width': '99%', 'height': '600px', 'float': 'left', 'background-color': colors.get('blue')},
-                             children=[dash_table.DataTable(id='transactions-table',
-                                                            data=tab.get('data'),
-                                                            columns=tab.get('columns'),
-                                                            style_data_conditional=DATA_TABLE_STYLE.get("style_data_conditional"),
-                                                            style_header=DATA_TABLE_STYLE.get("style_header"),
-                                                            style_cell={'minWidth': '5px', 'width': '50px', 'maxWidth': '200px',
-                                                                        'overflow': 'hidden', 'textOverflow': 'ellipsis'},
-                                                            editable=True,
-                                                            hidden_columns=tab.get('hidden_columns'),
-                                                            ),
+                             children=[dag.AgGrid(id="transactions-table",
+                                                  rowData=tab.get('data'),
+                                                  columnDefs=tab.get('columns'),
+                                                  ),
                                        html.Div(style={'height': '10px'}, id='blank-space')])
                 ]),
-                dcc.Tab(label="Budget", children='TODO: Budget'),
+                dcc.Tab(label="Budget", value='Budget', children=[
+                    'TODO: Budget']),
             ]),
     ]
 )
@@ -282,6 +255,7 @@ def parse_config_path(path):
 @app.callback(
     Output('current-config-memory', 'data'),
     Output('field-dropdown', 'value'),
+    Output('time-dropdown', 'value'),
     Output('date-range', 'style'),
 
     Input('field-dropdown', 'value'),
@@ -309,7 +283,7 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     # if original parameter dict, update current dict to og
-    if trigger == 'original-config-memory.data':
+    if trigger == 'original-config-memory.data' or curr_params is None:
         curr_params = og_params
     new_params = curr_params
 
@@ -323,7 +297,7 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
         if phase is not None:
             new_params['phase'] = phase
     elif trigger == 'field-dropdown.value':
-        new_params['field_filter'] = int(field_filter)
+        new_params['field_filter'] = int(field_filter) if field_filter else 0
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
         if time_filter == '0':  # This Month
@@ -336,6 +310,16 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
             new_params['end_date'] = date(today.year, today.month, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1)
             date_range_style = {'display': 'none'}
+        elif time_filter == '2':  # This Year
+            today = date.today()
+            new_params['end_date'] = today
+            new_params['start_date'] = date(today.year, 1, 1)
+            date_range_style = {'display': 'none'}
+        elif time_filter == '3':  # Last Year
+            today = date.today()
+            new_params['end_date'] = date(today.year, 1, 1) - timedelta(days=1)
+            new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
+            date_range_style = {'display': 'none'}
         elif time_filter == '4':  # All Time
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(2000, 1, 1)
@@ -346,36 +330,37 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
 
-    return new_params, new_params['field_filter'], date_range_style
-
-
-# @app.callback(
-#     Output('filter-text', 'value'),
-#     Input('transactions-table', 'data')
-# )
-# def loading_data(data):
-#     D = pd.DataFrame(data)
-#     # D.to_sql('test_backend', if_exists='replace')
-#
-#     return 'updated'
+    return new_params, new_params['field_filter'], new_params['time_filter'], date_range_style
 
 
 @app.callback(
     Output('money-graph', 'figure'),
+    Output('transactions-table', 'rowData'),
+    Output('transactions-table', 'columnDefs'),
     Input('current-config-memory', 'data'),
+    Input('selection_tabs', 'value')
 )
-def update_trends_graph(current_params):
+def update_tab_data(current_params, which_tab):
     """Updates the waveform graph given the parameters of the waveform and creates plot.
 
     Args:
         current_params: Dictionary of original parameters from loaded config file.
+        which_tab: The active tab to update the values of
 
     Returns:
-        Figure object of plot.
-        Dataframe of current, displayed parameters.
+        Figure object of plot
+        Table data dictionary
 
     """
-    return make_plot_object(current_params)
+    if which_tab == 'Trends':
+        tab_dict = make_table(zero_params_dict())
+        return make_plot_object(current_params), tab_dict['data'], tab_dict['columns']
+    elif which_tab == 'Transactions':
+        tab_dict = make_table(current_params)
+        return make_plot_object(zero_params_dict()), tab_dict['data'], tab_dict['columns']
+    elif which_tab == 'Budget':
+        tab_dict = make_table(zero_params_dict())
+        return make_plot_object(zero_params_dict()), tab_dict['data'], tab_dict['columns']
 
 
 @app.callback(
