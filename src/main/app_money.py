@@ -8,12 +8,14 @@ import dash_bootstrap_components as dbc
 from dash import Dash, dcc, html, Input, Output, callback
 import plotly.graph_objects as go
 import pandas as pd
-import numpy as np
-from scipy import signal
 import pymongo
 from datetime import date, datetime, timedelta
 from dotenv import load_dotenv
 import dash_ag_grid as dag
+import base64
+from io import StringIO
+
+from maintain_transactions import MaintainTransactions
 
 
 load_dotenv()
@@ -31,7 +33,7 @@ def zero_params_dict():
     Returns: Dictionary with all parameters set to 0.
 
     """
-    params = ['field_filter', 'time_filter', 'phase', 'start_date', 'end_date']
+    params = ['field_filter', 'time_filter', 'start_date', 'end_date']
     params_dict = dict.fromkeys(params, 0)
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
@@ -46,7 +48,6 @@ def make_plot_object(conf_dict):
 
     Args:
         conf_dict: Dictionary of the configuration parameters.
-        time_window: Window of data to display on plot.
 
     Returns: Plotly figure object.
 
@@ -99,18 +100,21 @@ def make_table(conf_dict):
     else:
         transactions = pd.DataFrame([table.find_one()])
     if len(transactions) == 0:
-        return {'data': [{'date': 'Na', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
-                          'currency': 'USD', 'original_description': 'No Available Data', 'account': 'Na', 'notes': ''}],
-                'columns': [{'field': 'date'}, {'field': 'category'}, {'field': 'description'}, {'field': 'amount'}, {'field': 'currency'},
-                            {'field': 'original_description'}, {'field': 'account'}, {'field': 'notes'}]
+        return {'data': [{'date': '00-00-0000', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
+                          'account': 'Na', 'notes': ''}],
+                'columns': [{'field': 'date'}, {'field': 'category'}, {'field': 'description'}, {'field': 'amount'},
+                            {'field': 'account'}, {'field': 'notes'}]
                 }
     transactions = transactions.drop(columns=['_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
-    columns = [{"field": i, 'filter': True} for i in transactions.columns]
+    columns = [{"field": i, 'filter': True, "resizable": True} for i in transactions.columns]
     # TODO Make table columns be hidden
-    hidden_columns = ['original_name', 'transaction_id', 'currency']
-    return {'data': data, 'columns': columns, 'hidden_columns': hidden_columns}
+    hidden_columns = ['original_name', 'original_description', 'currency']
+    for col in columns:
+        if col['field'] in hidden_columns:
+            col['hide'] = True
+    return {'data': data, 'columns': columns}
 
 
 colors = {
@@ -129,6 +133,8 @@ colors = {
     'text': '#EAEAEA',
 }
 
+########################################################################################
+
 # Initialize parameters
 current_config_dict = zero_params_dict()
 
@@ -138,13 +144,15 @@ fig = make_plot_object(current_config_dict)
 # Make initial table
 tab = make_table(current_config_dict)
 
+# Get accounts list
+accounts_list = list(table.find().distinct('account'))
+
 # Layout app window
 app.layout = html.Div(
     children=[
-        dcc.Store(id='original-config-memory'),
         dcc.Store(id='current-config-memory'),
         html.Div(
-            style={'background-color': 'grey'},  # colors['navy'], },
+            style={'background-color': 'grey'},
             children=[
                 html.Div(style={'width': '90px', 'display': 'inline-block', 'padding': '25px'},
                          children=[html.Img(id='aloha_logo', src="assets/spearmint_tilted_mirror.png", height="90px")]),
@@ -197,27 +205,24 @@ app.layout = html.Div(
                                   end_date=date.today()
                               )]),
 
-                     dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
-                                       children=["Phase (deg)"]),
-                              html.Div(style={'width': '50%', 'display': 'inline-block'},
-                                       children=[dcc.Input(
-                                           style={'width': 150},
-                                           id='phi-input',
-                                           type='number',
-                                           value=current_config_dict['phase'], min=0, max=360, )
-                                       ]),
-                              ]),
-                     html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '5px 20px'},
-                              children=[dcc.Input(id='config-input', type='text', style={'width': '100%'},
-                                                  placeholder='Path to config file')], ),
                      html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px', 'color': '#969696'}, ),
 
                      html.Div('', style={'padding': '0px 20px 20px 20px'}, ),  # seems to work better than html.Br()
-                     html.Div(style={'display': 'inline-block', 'padding': '0px 20px 20px 20px'},
-                              children=[html.Button(id='write-button', n_clicks=0, children=['Write New Config File'])]),
-                     html.I(id='output-write-button',
-                            style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}, ),
-                     html.Div('', style={'padding': '0px 20px 10px 20px'}, ),
+                     dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                                       children=['Select Account to Upload']),
+                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                                              'vertical-align': 'middle'},
+                                       children=[dcc.Dropdown(id='account-dropdown', className='dropdown',
+                                                              style={'background-color': '#8A94AA'},
+                                                              options=accounts_list)
+                                                 ],
+                                       ),
+                              ]),
+                     html.Div('', style={'padding': '0px 20px 10px 20px'}),
+                     html.Div(style={'display': 'inline-block'},
+                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV')])]),
+                     html.I(id='upload-message',
+                            style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
                  ]),
 
         dcc.Tabs(id='selection_tabs', value='Trends', children=[
@@ -233,6 +238,7 @@ app.layout = html.Div(
                              children=[dag.AgGrid(id="transactions-table",
                                                   rowData=tab.get('data'),
                                                   columnDefs=tab.get('columns'),
+                                                  columnSize="autoSize"
                                                   ),
                                        html.Div(style={'height': '10px'}, id='blank-space')])
                 ]),
@@ -243,15 +249,7 @@ app.layout = html.Div(
 )
 
 
-@app.callback(
-    Output('config-input-text', 'children'),
-    Output('original-config-memory', 'data'),
-    Input('config-input', 'value'),
-)
-def parse_config_path(path):
-    return '', zero_params_dict()
-
-
+########################################################################################
 @app.callback(
     Output('current-config-memory', 'data'),
     Output('field-dropdown', 'value'),
@@ -260,21 +258,19 @@ def parse_config_path(path):
 
     Input('field-dropdown', 'value'),
     Input('time-dropdown', 'value'),
-    Input('original-config-memory', 'data'),
     Input('current-config-memory', 'data'),
-    Input('phi-input', 'value'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
 )
-def update_plot_parameters(field_filter, time_filter, og_params, curr_params, phase, start_date, end_date):
+def update_plot_parameters(field_filter, time_filter, curr_params, start_date, end_date):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
         field_filter: Category filter
         time_filter: Time window filter
-        og_params: Dictionary of original parameters from loaded config file.
-        curr_params: Dictionary of current parameters.
-        phase: Phase of the waveform (deg).
+        curr_params: Dictionary of current parameters
+        end_date: end date of time window to show
+        start_date: start date of time window to show
 
     Returns: Current parameters for specified bit.
 
@@ -282,9 +278,9 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
     # Determine what triggered the parameter update
     trigger = dash.callback_context.triggered[0]['prop_id']
 
-    # if original parameter dict, update current dict to og
-    if trigger == 'original-config-memory.data' or curr_params is None:
-        curr_params = og_params
+    # Initialize params dict
+    if curr_params is None:
+        curr_params = zero_params_dict()
     new_params = curr_params
 
     if curr_params['time_filter'] == '5':
@@ -293,10 +289,7 @@ def update_plot_parameters(field_filter, time_filter, og_params, curr_params, ph
         date_range_style = {'display': 'none'}
 
     # if one of the parameters, change them in the current dict
-    if 'input' in trigger:
-        if phase is not None:
-            new_params['phase'] = phase
-    elif trigger == 'field-dropdown.value':
+    if trigger == 'field-dropdown.value':
         new_params['field_filter'] = int(field_filter) if field_filter else 0
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
@@ -364,44 +357,48 @@ def update_tab_data(current_params, which_tab):
 
 
 @app.callback(
-    Output('output-write-button', 'children'),
-    Input('write-button', 'n_clicks'),
-    Input('current-config-memory', 'data'),
-    Input('config-input', 'value'),
+    Output('upload-message', 'children'),
+    Output('upload-data', 'style'),
+    Input('account-dropdown', 'value'),
+    Input('upload-data', 'contents'),
 )
-def write_new_config(clicks, current_dict, og_path):
+def parse_upload_transaction_file(account, loaded_file):
     """When button is clicked, checks for valid current file then writes new config file with updated parameters.
 
     Args:
-        clicks: Number of times the write file button has been clicked.
-        current_dict: Original config file.
-        og_path: Path to original config file.
+        account: Account name for transactions
+        loaded_file: contents of uploaded transactions file
 
     Returns: String if the file is able to be written or not.
 
     """
-    if 'write-button' in dash.callback_context.triggered[0]['prop_id']:
-        if og_path is not None:
-            if os.path.isfile(og_path):
-                og_file_name = os.path.basename(og_path)
-                file_name = og_file_name[:-4] + '_v' + str(clicks) + '.txt'
-                new_path = og_path[:-len(og_file_name)]
-                write_file = open(os.path.join(new_path, file_name), 'w')
-                for key in current_dict:
-                    if key == 'version':
-                        if current_dict[key] != 0:
-                            write_file.write(key + ' = ' + current_dict[key] + '_v' + str(clicks) + '\n')
-                        else:
-                            return 'Ensure config file has all required parameters.'
-                    else:
-                        write_file.write(key + ' = ' + str(current_dict[key]) + '\n')
-                return 'Wrote new config file: ' + file_name
+    upload_button = {'display': 'none'}
+    msg = ''
+
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'account-dropdown.value':
+        if account is not None:
+            upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
+    elif trigger == 'upload-data.contents':
+        decodedBytes = base64.b64decode(loaded_file[0].split(',')[-1])
+        file_text = decodedBytes.decode("ascii")
+        try:
+            m = pd.read_csv(StringIO(file_text))
+        except:
+            msg = 'File must be in CSV format'
+            return msg, upload_button
+
+        mt = MaintainTransactions()
+        results = mt.add_transactions(m, account)
+        if isinstance(results, int):
+            if results == 0:
+                msg = 'No new transactions to upload'
             else:
-                return 'Enter valid file path before writing new config file.'
+                msg = f"Successfully uploaded {results} new transactions"
         else:
-            return 'Enter a file path before writing new config file.'
-    else:
-        return ''
+            msg = results
+
+    return msg, upload_button
 
 
 if __name__ == '__main__':
