@@ -21,7 +21,8 @@ from maintain_transactions import MaintainTransactions
 load_dotenv()
 client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
 client = client_mongo[os.getenv("MONGO_DB")]
-table = client[os.getenv("MONGO_CLIENT")]
+transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
+budget_table = client[os.getenv("BUDGET_CLIENT")]
 
 external_stylesheets = ['assets/spearmint.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -56,11 +57,11 @@ def make_plot_object(conf_dict):
     fig_obj = go.Figure()
 
     if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(table.find({'date': {
+        transactions = pd.DataFrame(transactions_table.find({'date': {
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
-        transactions = pd.DataFrame(table.find())
+        transactions = pd.DataFrame(transactions_table.find())
 
     if len(transactions) == 0:
         # TODO Error, no transactions found for the given filters
@@ -70,7 +71,7 @@ def make_plot_object(conf_dict):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Category")
     elif conf_dict['field_filter'] == 1:
-        for cat, grp in transactions.groupby('account_name'):
+        for cat, grp in transactions.groupby('account name'):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Account")
 
@@ -94,26 +95,33 @@ def make_plot_object(conf_dict):
 
 def make_table(conf_dict):
     if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(table.find({'date': {
+        transactions = pd.DataFrame(transactions_table.find({'date': {
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
-        transactions = pd.DataFrame([table.find_one()])
+        transactions = pd.DataFrame([transactions_table.find_one()])
     if len(transactions) == 0:
-        return {'data': [{'date': '00-00-0000', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
-                          'account': 'Na', 'notes': ''}],
-                'columns': [{'field': 'date'}, {'field': 'category'}, {'field': 'description'}, {'field': 'amount'},
-                            {'field': 'account'}, {'field': 'notes'}]
-                }
+        transactions = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'], 'amount': [0],
+                                               'account': ['Na'], 'notes': ['']})
+
     transactions = transactions.drop(columns=['_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
-    columns = [{"field": i, 'filter': True, "resizable": True} for i in transactions.columns]
-    # TODO Make table columns be hidden
-    hidden_columns = ['original_name', 'original_description', 'currency']
+    columns = [{"field": i, 'filter': True, "resizable": True, 'sortable': True} for i in transactions.columns]
+    hidden_columns = ['original description', 'currency']
     for col in columns:
         if col['field'] in hidden_columns:
             col['hide'] = True
+        if col['field'] == 'amount':
+            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['type'] = 'numericColumn'
+            col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
+        if col['field'] == 'category':
+            col['width'] = 150
+        if col['field'] == 'description':
+            col['width'] = 400
+        if col['field'] == 'account name':
+            col['width'] = 300
     return {'data': data, 'columns': columns}
 
 
@@ -145,7 +153,7 @@ fig = make_plot_object(current_config_dict)
 tab = make_table(current_config_dict)
 
 # Get accounts list
-accounts_list = list(table.find().distinct('account'))
+accounts_list = list(transactions_table.find().distinct('account name'))
 
 # Layout app window
 app.layout = html.Div(
@@ -182,7 +190,7 @@ app.layout = html.Div(
                                        children=['Time Window']),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
-                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'],  # maxHeight=400,
+                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'], maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
                                                               style={'background-color': '#8A94AA'},
                                                               options=[
@@ -208,9 +216,10 @@ app.layout = html.Div(
                      html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px', 'color': '#969696'}, ),
 
                      html.Div('', style={'padding': '0px 20px 20px 20px'}, ),  # seems to work better than html.Br()
-                     dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                     dbc.Row([html.Div(style={'width': '75%', 'display': 'inline-block', 'padding': '11px 20px'},
                                        children=['Select Account to Upload']),
-                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                              html.Br(),
+                              html.Div(style={'width': '90%', 'display': 'inline-block', 'padding': '0 20px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='account-dropdown', className='dropdown',
                                                               style={'background-color': '#8A94AA'},
@@ -220,7 +229,8 @@ app.layout = html.Div(
                               ]),
                      html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
-                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV')])]),
+                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV',
+                                                                                                          style={'backgroundColor': colors.get('navy')})])]),
                      html.I(id='upload-message',
                             style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
                  ]),
@@ -234,13 +244,16 @@ app.layout = html.Div(
                              ]),
                 ]),
                 dcc.Tab(label="Transactions", value='Transactions', children=[
-                    html.Div(style={'width': '99%', 'height': '600px', 'float': 'left', 'background-color': colors.get('blue')},
-                             children=[dag.AgGrid(id="transactions-table",
+                    html.Div(style={'width': '99%', 'height': '100%', 'float': 'left', 'background-color': colors.get('blue')},
+                             children=[html.Div(style={'height': '10px'}, id='blank-space'),
+                                       dag.AgGrid(id="transactions-table",
+                                                  style={"height": '600px'},
                                                   rowData=tab.get('data'),
                                                   columnDefs=tab.get('columns'),
                                                   columnSize="autoSize"
                                                   ),
-                                       html.Div(style={'height': '10px'}, id='blank-space')])
+                                       html.Div(style={'height': '10px'}, id='blank-space-2')
+                                       ])
                 ]),
                 dcc.Tab(label="Budget", value='Budget', children=[
                     'TODO: Budget']),

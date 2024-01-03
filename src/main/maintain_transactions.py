@@ -9,7 +9,7 @@ class MaintainTransactions:
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
         client = client_mongo[os.getenv("MONGO_DB")]
-        self.table = client[os.getenv("MONGO_CLIENT")]
+        self.table = client[os.getenv("TRANSACTIONS_CLIENT")]
 
     def add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added"""
