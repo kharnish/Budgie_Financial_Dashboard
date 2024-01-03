@@ -24,7 +24,7 @@ client = client_mongo[os.getenv("MONGO_DB")]
 transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
 budget_table = client[os.getenv("BUDGET_CLIENT")]
 
-external_stylesheets = ['assets/spearmint.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
+external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 
@@ -222,8 +222,18 @@ app.layout = html.Div(
                      html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px', 'color': '#969696'}, ),
 
                      html.Div('', style={'padding': '0px 20px 20px 20px'}, ),  # seems to work better than html.Br()
-                     dbc.Row([html.Div(style={'width': '75%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                       children=['Select Account to Upload']),
+                     dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
+                                       children=['Select Account to Upload Transactions  ',
+                                                 html.I(className="fa-solid fa-circle-info", id='help-icon'),
+                                                 dbc.Tooltip("Select the corresponding account for the transactions CSV file. "
+                                                             "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down.  "
+                                                             "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
+                                                             "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. "
+                                                             "You can select multiple files to upload simultaneously for the same account. ",
+                                                             target='help-icon',
+                                                             placement='right',
+                                                             style={'font-size': 14, 'maxWidth': 800, 'width': 800},
+                                                             )]),
                               html.Br(),
                               html.Div(style={'width': '90%', 'display': 'inline-block', 'padding': '0 20px',
                                               'vertical-align': 'middle'},
