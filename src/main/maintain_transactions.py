@@ -51,10 +51,10 @@ class MaintainTransactions:
         transaction_list = []
         for i, row in df.iterrows():
             if account_labels:
-                account = row['account']
+                account = row['account name']
 
             duplicates = list(self.table.find({'amount': row['amount'], 'original description': row['original description'],
-                                               'account': account}))
+                                               'account name': account}))
 
             if len(duplicates) > 0:
                 for dup in duplicates:
@@ -81,7 +81,7 @@ class MaintainTransactions:
                                'amount': td['amount'],
                                'currency': 'USD',
                                'original description': td['original description'],
-                               'account': account,
+                               'account name': account,
                                'notes': ''}
         return default_transaction
 
@@ -89,4 +89,4 @@ class MaintainTransactions:
 if __name__ == '__main__':
     mt = MaintainTransactions()
     mint_csv_path = ''
-    mt.add_transactions(mint_csv_path)
+    print(mt.add_transactions(mint_csv_path))
