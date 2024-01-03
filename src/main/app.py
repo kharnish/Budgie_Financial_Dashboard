@@ -125,6 +125,12 @@ def make_table(conf_dict):
     return {'data': data, 'columns': columns}
 
 
+def get_accounts_list():
+    acc_list = list(transactions_table.find().distinct('account name'))
+    acc_list.extend(['Add new account...'])
+    return acc_list
+
+
 colors = {
     'navy': '#162956',
     'blue': '#2E5590',
@@ -153,7 +159,7 @@ fig = make_plot_object(current_config_dict)
 tab = make_table(current_config_dict)
 
 # Get accounts list
-accounts_list = list(transactions_table.find().distinct('account name'))
+accounts_list = get_accounts_list()
 
 # Layout app window
 app.layout = html.Div(
@@ -227,6 +233,8 @@ app.layout = html.Div(
                                                  ],
                                        ),
                               ]),
+                     html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
+                              children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'}, placeholder='New account name')], ),
                      html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
                               children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV',
@@ -372,10 +380,13 @@ def update_tab_data(current_params, which_tab):
 @app.callback(
     Output('upload-message', 'children'),
     Output('upload-data', 'style'),
+    Output('account-input', 'style'),
+    Output('account-dropdown', 'options'),
     Input('account-dropdown', 'value'),
     Input('upload-data', 'contents'),
+    Input('account-input', 'value'),
 )
-def parse_upload_transaction_file(account, loaded_file):
+def parse_upload_transaction_file(account, loaded_file, new_account):
     """When button is clicked, checks for valid current file then writes new config file with updated parameters.
 
     Args:
@@ -387,31 +398,46 @@ def parse_upload_transaction_file(account, loaded_file):
     """
     upload_button = {'display': 'none'}
     msg = ''
+    account_input = {'display': 'none'}
+    acc_list = get_accounts_list()
 
     trigger = dash.callback_context.triggered[0]['prop_id']
     if trigger == 'account-dropdown.value':
-        if account is not None:
+        if account == 'Add new account...':
+            account_input = {'display': 'inline-block', 'width': '100%'}
+        elif account is not None:
             upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
     elif trigger == 'upload-data.contents':
-        decodedBytes = base64.b64decode(loaded_file[0].split(',')[-1])
-        file_text = decodedBytes.decode("ascii")
-        try:
-            m = pd.read_csv(StringIO(file_text))
-        except:
-            msg = 'File must be in CSV format'
-            return msg, upload_button
+        if account == 'Add new account...':
+            account = new_account
+        msg = []
+        for i, file in enumerate(loaded_file):
+            decodedBytes = base64.b64decode(file.split(',')[-1])
+            file_text = decodedBytes.decode("ascii")
+            try:
+                m = pd.read_csv(StringIO(file_text))
+            except:
+                msg.append(f"File {i+1}: File must be in CSV format\n")
+                msg.append(html.Br())
+                continue
 
-        mt = MaintainTransactions()
-        results = mt.add_transactions(m, account)
-        if isinstance(results, int):
-            if results == 0:
-                msg = 'No new transactions to upload'
+            mt = MaintainTransactions()
+            results = mt.add_transactions(m, account)
+            if isinstance(results, int):
+                if results == 0:
+                    msg.append(f"File {i+1}: No new transactions to upload")
+                    msg.append(html.Br())
+                else:
+                    msg.append(f"File {i+1}: Successfully uploaded {results} new transactions\n")
+                    msg.append(html.Br())
             else:
-                msg = f"Successfully uploaded {results} new transactions"
-        else:
-            msg = results
+                msg.append(f"File {i+1}: {results}\n")
+                msg.append(html.Br())
+    elif trigger == 'account-input.value':
+        account_input = {'display': 'inline-block', 'width': '100%'}
+        upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
 
-    return msg, upload_button
+    return msg, upload_button, account_input, acc_list
 
 
 if __name__ == '__main__':
