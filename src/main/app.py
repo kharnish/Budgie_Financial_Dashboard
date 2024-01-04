@@ -21,9 +21,10 @@ from maintain_transactions import MaintainTransactions
 load_dotenv()
 client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
 client = client_mongo[os.getenv("MONGO_DB")]
-table = client[os.getenv("MONGO_CLIENT")]
+transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
+budget_table = client[os.getenv("BUDGET_CLIENT")]
 
-external_stylesheets = ['assets/spearmint.css']  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
+external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 
@@ -56,11 +57,11 @@ def make_plot_object(conf_dict):
     fig_obj = go.Figure()
 
     if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(table.find({'date': {
+        transactions = pd.DataFrame(transactions_table.find({'date': {
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
-        transactions = pd.DataFrame(table.find())
+        transactions = pd.DataFrame(transactions_table.find())
 
     if len(transactions) == 0:
         # TODO Error, no transactions found for the given filters
@@ -70,7 +71,7 @@ def make_plot_object(conf_dict):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Category")
     elif conf_dict['field_filter'] == 1:
-        for cat, grp in transactions.groupby('account_name'):
+        for cat, grp in transactions.groupby('account name'):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Account")
 
@@ -94,27 +95,40 @@ def make_plot_object(conf_dict):
 
 def make_table(conf_dict):
     if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(table.find({'date': {
+        transactions = pd.DataFrame(transactions_table.find({'date': {
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     else:
-        transactions = pd.DataFrame([table.find_one()])
+        transactions = pd.DataFrame([transactions_table.find_one()])
     if len(transactions) == 0:
-        return {'data': [{'date': '00-00-0000', 'category': 'unknown', 'description': 'No Available Data', 'amount': 0,
-                          'account': 'Na', 'notes': ''}],
-                'columns': [{'field': 'date'}, {'field': 'category'}, {'field': 'description'}, {'field': 'amount'},
-                            {'field': 'account'}, {'field': 'notes'}]
-                }
+        transactions = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'], 'amount': [0],
+                                               'account': ['Na'], 'notes': ['']})
+
     transactions = transactions.drop(columns=['_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
-    columns = [{"field": i, 'filter': True, "resizable": True} for i in transactions.columns]
-    # TODO Make table columns be hidden
-    hidden_columns = ['original_name', 'original_description', 'currency']
+    columns = [{"field": i, 'filter': True, "resizable": True, 'sortable': True} for i in transactions.columns]
+    hidden_columns = ['original description', 'currency']
     for col in columns:
         if col['field'] in hidden_columns:
             col['hide'] = True
+        if col['field'] == 'amount':
+            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['type'] = 'numericColumn'
+            col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
+        if col['field'] == 'category':
+            col['width'] = 150
+        if col['field'] == 'description':
+            col['width'] = 400
+        if col['field'] == 'account name':
+            col['width'] = 300
     return {'data': data, 'columns': columns}
+
+
+def get_accounts_list():
+    acc_list = list(transactions_table.find().distinct('account name'))
+    acc_list.extend(['Add new account...'])
+    return acc_list
 
 
 colors = {
@@ -145,7 +159,7 @@ fig = make_plot_object(current_config_dict)
 tab = make_table(current_config_dict)
 
 # Get accounts list
-accounts_list = list(table.find().distinct('account'))
+accounts_list = get_accounts_list()
 
 # Layout app window
 app.layout = html.Div(
@@ -182,7 +196,7 @@ app.layout = html.Div(
                                        children=['Time Window']),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
-                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'],  # maxHeight=400,
+                                       children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'], maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
                                                               style={'background-color': '#8A94AA'},
                                                               options=[
@@ -208,9 +222,20 @@ app.layout = html.Div(
                      html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px', 'color': '#969696'}, ),
 
                      html.Div('', style={'padding': '0px 20px 20px 20px'}, ),  # seems to work better than html.Br()
-                     dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                       children=['Select Account to Upload']),
-                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                     dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
+                                       children=['Select Account to Upload Transactions  ',
+                                                 html.I(className="fa-solid fa-circle-info", id='help-icon'),
+                                                 dbc.Tooltip("Select the corresponding account for the transactions CSV file. "
+                                                             "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down.  "
+                                                             "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
+                                                             "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. "
+                                                             "You can select multiple files to upload simultaneously for the same account. ",
+                                                             target='help-icon',
+                                                             placement='right',
+                                                             style={'font-size': 14, 'maxWidth': 800, 'width': 800},
+                                                             )]),
+                              html.Br(),
+                              html.Div(style={'width': '90%', 'display': 'inline-block', 'padding': '0 20px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='account-dropdown', className='dropdown',
                                                               style={'background-color': '#8A94AA'},
@@ -218,9 +243,12 @@ app.layout = html.Div(
                                                  ],
                                        ),
                               ]),
+                     html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
+                              children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'}, placeholder='New account name')], ),
                      html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
-                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV')])]),
+                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV',
+                                                                                                          style={'backgroundColor': colors.get('navy')})])]),
                      html.I(id='upload-message',
                             style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
                  ]),
@@ -234,13 +262,16 @@ app.layout = html.Div(
                              ]),
                 ]),
                 dcc.Tab(label="Transactions", value='Transactions', children=[
-                    html.Div(style={'width': '99%', 'height': '600px', 'float': 'left', 'background-color': colors.get('blue')},
-                             children=[dag.AgGrid(id="transactions-table",
+                    html.Div(style={'width': '99%', 'height': '100%', 'float': 'left', 'background-color': colors.get('blue')},
+                             children=[html.Div(style={'height': '10px'}, id='blank-space'),
+                                       dag.AgGrid(id="transactions-table",
+                                                  style={"height": '600px'},
                                                   rowData=tab.get('data'),
                                                   columnDefs=tab.get('columns'),
                                                   columnSize="autoSize"
                                                   ),
-                                       html.Div(style={'height': '10px'}, id='blank-space')])
+                                       html.Div(style={'height': '10px'}, id='blank-space-2')
+                                       ])
                 ]),
                 dcc.Tab(label="Budget", value='Budget', children=[
                     'TODO: Budget']),
@@ -359,10 +390,13 @@ def update_tab_data(current_params, which_tab):
 @app.callback(
     Output('upload-message', 'children'),
     Output('upload-data', 'style'),
+    Output('account-input', 'style'),
+    Output('account-dropdown', 'options'),
     Input('account-dropdown', 'value'),
     Input('upload-data', 'contents'),
+    Input('account-input', 'value'),
 )
-def parse_upload_transaction_file(account, loaded_file):
+def parse_upload_transaction_file(account, loaded_file, new_account):
     """When button is clicked, checks for valid current file then writes new config file with updated parameters.
 
     Args:
@@ -374,31 +408,46 @@ def parse_upload_transaction_file(account, loaded_file):
     """
     upload_button = {'display': 'none'}
     msg = ''
+    account_input = {'display': 'none'}
+    acc_list = get_accounts_list()
 
     trigger = dash.callback_context.triggered[0]['prop_id']
     if trigger == 'account-dropdown.value':
-        if account is not None:
+        if account == 'Add new account...':
+            account_input = {'display': 'inline-block', 'width': '100%'}
+        elif account is not None:
             upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
     elif trigger == 'upload-data.contents':
-        decodedBytes = base64.b64decode(loaded_file[0].split(',')[-1])
-        file_text = decodedBytes.decode("ascii")
-        try:
-            m = pd.read_csv(StringIO(file_text))
-        except:
-            msg = 'File must be in CSV format'
-            return msg, upload_button
+        if account == 'Add new account...':
+            account = new_account
+        msg = []
+        for i, file in enumerate(loaded_file):
+            decodedBytes = base64.b64decode(file.split(',')[-1])
+            file_text = decodedBytes.decode("ascii")
+            try:
+                m = pd.read_csv(StringIO(file_text))
+            except:
+                msg.append(f"File {i+1}: File must be in CSV format\n")
+                msg.append(html.Br())
+                continue
 
-        mt = MaintainTransactions()
-        results = mt.add_transactions(m, account)
-        if isinstance(results, int):
-            if results == 0:
-                msg = 'No new transactions to upload'
+            mt = MaintainTransactions()
+            results = mt.add_transactions(m, account)
+            if isinstance(results, int):
+                if results == 0:
+                    msg.append(f"File {i+1}: No new transactions to upload")
+                    msg.append(html.Br())
+                else:
+                    msg.append(f"File {i+1}: Successfully uploaded {results} new transactions\n")
+                    msg.append(html.Br())
             else:
-                msg = f"Successfully uploaded {results} new transactions"
-        else:
-            msg = results
+                msg.append(f"File {i+1}: {results}\n")
+                msg.append(html.Br())
+    elif trigger == 'account-input.value':
+        account_input = {'display': 'inline-block', 'width': '100%'}
+        upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
 
-    return msg, upload_button
+    return msg, upload_button, account_input, acc_list
 
 
 if __name__ == '__main__':
