@@ -131,7 +131,7 @@ def get_accounts_list():
 def make_budget_plot(conf_dict):
     budget_dict = {}
     for item in budget_table.find():
-        budget_dict[item['name']] = item['value']
+        budget_dict[item['category']] = item['value']
 
     transactions = pd.DataFrame(transactions_table.find({'date': {
         '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
@@ -314,14 +314,16 @@ app.layout = html.Div(
                              dbc.Row(children=[
                                  html.Div(style={'display': 'inline-block', 'padding': '10px'},
                                           children=[html.Button(children=['Add New Budget ', html.I(className="fa-solid fa-plus")],
-                                                                id='budget-button', style={'width': '200px', 'backgroundColor': colors.get('navy')})]),
+                                                                id='budget-button', style={'backgroundColor': colors.get('navy')})]),
                                  html.Div(style={'display': 'inline-block', 'padding': '10px'},
                                           children=[dcc.Dropdown(id='budget-dropdown', className='dropdown', clearable=True, placeholder="Select category...",
-                                                                 style={'display': 'none'}, options=[''])]),
-                                 html.Div(style={'display': 'inline-block', 'width': '20%', 'padding': '10px'},
-                                          children=[dcc.Input(id='budget-input', type='number', style={'display': 'inline-block'}, placeholder='$ Budget Amount')]),
+                                                                 style={'display': 'none'}, options=['']),
+                                                    dcc.Input(id='budget-input', type='number', style={'display': 'inline-block'}, placeholder='$ Budget Amount'),
+                                                    html.Button(children=['Submit budget ', html.I(className="fa-solid fa-plus")],
+                                                                id='budget-submit', style={'width': '200px', 'backgroundColor': colors.get('navy')})
+                                                    ]),
+                                 html.Div(style={'height': '10px'}, id='blank-space-3')
                              ]),
-                             html.Div(style={'height': '10px'}, id='blank-space-3')
                          ]),
             ]),
         ]),
@@ -440,17 +442,28 @@ def update_tab_data(current_params, which_tab):
 @app.callback(
     Output('budget-dropdown', 'style'),
     Output('budget-input', 'style'),
+    Output('budget-submit', 'style'),
     Output('budget-dropdown', 'options'),
     Input('budget-button', 'n_clicks'),
     Input('budget-dropdown', 'value'),
     Input('budget-input', 'value'),
+    Input('budget-submit', 'n_clicks'),
 )
-def add_new_budget(n_clicks, budget_category, budget_value):
-    cat_list = list(transactions_table.find().distinct('category'))
+def add_new_budget(n_clicks, budget_category, budget_value, submit):
+    trigger = dash.callback_context.triggered[0]['prop_id']
+
     if n_clicks is not None:
-        return {'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px'}, {'display': 'inline-block'}, cat_list
+        cat_list = list(transactions_table.find().distinct('category'))
+        # make it that if you select an existing category, it will overwrite the budget
+        if trigger == 'budget-submit.n_clicks':
+            if budget_category and budget_value:
+                mt = MaintainTransactions()
+                mt.add_budget_item(budget_category, budget_value)
+                return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, []
+        return {'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px'}, \
+               {'display': 'inline-block'}, {'display': 'inline-block', 'backgroundColor': colors.get('navy')}, cat_list
     else:
-        return {'display': 'none'}, {'display': 'none'}, []
+        return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, []
 
 
 @app.callback(
