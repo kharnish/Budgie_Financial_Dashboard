@@ -9,7 +9,8 @@ class MaintainTransactions:
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
         client = client_mongo[os.getenv("MONGO_DB")]
-        self.table = client[os.getenv("TRANSACTIONS_CLIENT")]
+        self.transaction_table = client[os.getenv("TRANSACTIONS_CLIENT")]
+        self.budget_table = client[os.getenv("BUDGET_CLIENT")]
 
     def add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added"""
@@ -53,7 +54,7 @@ class MaintainTransactions:
             if account_labels:
                 account = row['account name']
 
-            duplicates = list(self.table.find({'amount': row['amount'], 'original description': row['original description'],
+            duplicates = list(self.transaction_table.find({'amount': row['amount'], 'original description': row['original description'],
                                                'account name': account}))
 
             if len(duplicates) > 0:
@@ -69,7 +70,7 @@ class MaintainTransactions:
                 # there's no match, so add the transaction
                 transaction_list.append(self.make_transaction_dict(row, account))
         if len(transaction_list) > 0:
-            self.table.insert_many(transaction_list)
+            self.transaction_table.insert_many(transaction_list)
         return len(transaction_list)
 
     @staticmethod
@@ -85,8 +86,11 @@ class MaintainTransactions:
                                'notes': ''}
         return default_transaction
 
+    def add_budget_item(self, category, value):
+        self.budget_table.insert_one({'category': category, 'value': value})
+
 
 if __name__ == '__main__':
     mt = MaintainTransactions()
-    mint_csv_path = ''
-    print(mt.add_transactions(mint_csv_path))
+    # mint_csv_path = ''
+    # print(mt.add_transactions(mint_csv_path))
