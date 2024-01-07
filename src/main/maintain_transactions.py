@@ -87,7 +87,14 @@ class MaintainTransactions:
         return default_transaction
 
     def add_budget_item(self, category, value):
-        self.budget_table.insert_one({'category': category, 'value': value})
+        existing = list(self.budget_table.find({'category': category}))
+        if len(existing) == 1:
+            self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
+        else:
+            self.budget_table.insert_one({'category': category, 'value': value})
+
+    def rm_budget_item(self, category, value):
+        self.budget_table.delete_one({'category': category, 'value': value})
 
 
 if __name__ == '__main__':

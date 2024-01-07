@@ -5,7 +5,7 @@ Date:  02 May 2021
 import os
 import dash
 import dash_bootstrap_components as dbc
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import Dash, callback, dcc, html, Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import pymongo
@@ -23,7 +23,7 @@ client = client_mongo[os.getenv("MONGO_DB")]
 transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
 budget_table = client[os.getenv("BUDGET_CLIENT")]
 
-external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
+external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
@@ -133,6 +133,8 @@ def make_budget_plot(conf_dict):
     for item in budget_table.find():
         budget_dict[item['category']] = item['value']
 
+    # TODO Limit the budget plot to only show one month
+    #  Or make it show month-to-month for each category
     transactions = pd.DataFrame(transactions_table.find({'date': {
         '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
         '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
@@ -140,11 +142,15 @@ def make_budget_plot(conf_dict):
         transactions = EMPTY_TRANSACTION
 
     fig_obj = go.Figure()
-    for cat, grp in transactions.groupby('category'):
-        if cat in budget_dict.keys():
-            percent = -100 * grp['amount'].sum() / budget_dict[cat]
-            fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h'))
-    fig_obj.update_xaxes(title_text="Category")
+    for cat in budget_dict.keys():
+        spent = float(transactions[transactions['category'] == cat]['amount'].sum())
+        percent = -100 * spent / budget_dict[cat]
+        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside"))
+    fig_obj.update_xaxes(title_text="% Spent")
+
+    fig_obj.add_vline(x=100, line_width=3, line_color="white")
+    # TODO make a vertical line to show how far along you are in the month
+    #  fig_obj.add_vline(x=100, line_width=1, line_dash="dash", line_color="black")
 
     fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
                          zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
@@ -201,9 +207,9 @@ app.layout = html.Div(
         html.Div(
             style={'background-color': 'grey'},
             children=[
-                html.Div(style={'width': '90px', 'display': 'inline-block', 'padding': '25px'},
+                html.Div(style={'width': 'auto', 'display': 'inline-block', 'padding': '25px'},
                          children=[html.Img(id='aloha_logo', src="assets/spearmint_tilted_mirror.png", height="90px")]),
-                html.H1(style={'width': '70%', 'color': 'white', 'display': 'inline-block'},
+                html.H1(style={'width': '70%', 'height': '90px', 'color': 'white', 'display': 'inline-block'},
                         children=['Spearmint Personal Finance Management']),
             ]
         ),
@@ -310,21 +316,38 @@ app.layout = html.Div(
                 html.Div(id="budget-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
                          children=[
                              dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
-                                       id='budget-graph', figure=fig),
-                             dbc.Row(children=[
-                                 html.Div(style={'display': 'inline-block', 'padding': '10px'},
-                                          children=[html.Button(children=['Add New Budget ', html.I(className="fa-solid fa-plus")],
-                                                                id='budget-button', style={'backgroundColor': colors.get('navy')})]),
-                                 html.Div(style={'display': 'inline-block', 'padding': '10px'},
-                                          children=[dcc.Dropdown(id='budget-dropdown', className='dropdown', clearable=True, placeholder="Select category...",
-                                                                 style={'display': 'none'}, options=['']),
-                                                    dcc.Input(id='budget-input', type='number', style={'display': 'inline-block'}, placeholder='$ Budget Amount'),
-                                                    html.Button(children=['Submit budget ', html.I(className="fa-solid fa-plus")],
-                                                                id='budget-submit', style={'width': '200px', 'backgroundColor': colors.get('navy')})
-                                                    ]),
-                                 html.Div(style={'height': '10px'}, id='blank-space-3')
-                             ]),
+                                       id='budget-graph', figure=fig)]),
+                html.Div(id='budget-value-input-block', style={'width': '95%', 'height': '200px', 'float': 'left'},
+                         children=[
+                             html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left', 'width': '95%'},
+                                      children=[html.Button(id='new-budget-button', style={'backgroundColor': colors.get('navy'), 'width': 'auto'},
+                                                            children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
+                             dbc.Modal(id="budget-modal", is_open=False, children=[
+                                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                                     dbc.ModalBody(children=[
+                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                                  children=['Select budget category:',
+                                                            dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                                         style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px', 'vertical-align': 'middle'},
+                                                                         options=[''])]),
+                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                                  children=['Define budget amount:', html.Br(),
+                                                            dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                                         html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
+                                                  children=[dbc.Button(children=["Delete Budget ",
+                                                                                 html.I(className="fa-solid fa-trash-can", id='help-icon')],
+                                                                       id="modal-delete", color="danger", style={'float': 'right'})]),
+                                         html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
+                                     ]),
+                                     dbc.ModalFooter([
+                                         html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                                         dbc.Button(children=["Submit ",
+                                                              html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
+                                                    id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                                       ),
+                                 ]),
                          ]),
+                html.Div(style={'height': '10px'}, id='blank-space-3')
             ]),
         ]),
     ]
@@ -440,30 +463,46 @@ def update_tab_data(current_params, which_tab):
 
 
 @app.callback(
-    Output('budget-dropdown', 'style'),
-    Output('budget-input', 'style'),
-    Output('budget-submit', 'style'),
-    Output('budget-dropdown', 'options'),
-    Input('budget-button', 'n_clicks'),
-    Input('budget-dropdown', 'value'),
-    Input('budget-input', 'value'),
-    Input('budget-submit', 'n_clicks'),
+    Output("budget-modal", "is_open"),
+    Output('budget-category-dropdown', 'options'),
+    Output('budget-category-dropdown', 'value'),
+    Output('budget-value-input', 'value'),
+    Output('modal-body-text', 'children'),
+    Output('modal-delete', 'style'),
+    Input("new-budget-button", "n_clicks"),
+    Input("modal-cancel", "n_clicks"),
+    Input("modal-submit", "n_clicks"),
+    Input('budget-category-dropdown', 'value'),
+    Input('budget-value-input', 'value'),
+    Input('modal-delete', 'n_clicks')
 )
-def add_new_budget(n_clicks, budget_category, budget_value, submit):
+def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_value, delete_button):
     trigger = dash.callback_context.triggered[0]['prop_id']
-
-    if n_clicks is not None:
+    delete = {'display': 'none'}
+    if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value', 'budget-value-input.value']:
         cat_list = list(transactions_table.find().distinct('category'))
-        # make it that if you select an existing category, it will overwrite the budget
-        if trigger == 'budget-submit.n_clicks':
-            if budget_category and budget_value:
-                mt = MaintainTransactions()
-                mt.add_budget_item(budget_category, budget_value)
-                return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, []
-        return {'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px'}, \
-               {'display': 'inline-block'}, {'display': 'inline-block', 'backgroundColor': colors.get('navy')}, cat_list
+        if budget_category != 'Select category...':
+            bv = list(budget_table.find({'category': budget_category}))
+            if len(bv) > 0:
+                budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
+                delete = {'float': 'right'}
+            elif trigger == 'budget-category-dropdown.value':
+                budget_value = '$ 0'
+        return True, cat_list, budget_category, budget_value, '', delete
+    elif trigger == 'modal-submit.n_clicks':
+        cat_list = list(transactions_table.find().distinct('category'))
+        if budget_category != 'Select category...' and budget_value != '$ 0':
+            mt = MaintainTransactions()
+            mt.add_budget_item(budget_category, budget_value)
+            return False, [], 'Select category...', '$ 0', '', delete
+        else:
+            return True, cat_list, budget_category, budget_value, 'You must specify category and budget amount for that category', delete
+    elif trigger == 'modal-delete.n_clicks':
+        mt = MaintainTransactions()
+        mt.rm_budget_item(budget_category, budget_value)
+        return False, [], 'Select category...', '$ 0', '', delete
     else:
-        return {'display': 'none'}, {'display': 'none'}, {'display': 'none'}, []
+        return False, [], 'Select category...', '$ 0', '', delete
 
 
 @app.callback(
