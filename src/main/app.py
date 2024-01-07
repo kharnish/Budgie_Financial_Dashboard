@@ -5,7 +5,7 @@ Date:  02 May 2021
 import os
 import dash
 import dash_bootstrap_components as dbc
-from dash import Dash, dcc, html, Input, Output, callback
+from dash import Dash, callback, dcc, html, Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import pymongo
@@ -17,15 +17,17 @@ from io import StringIO
 
 from maintain_transactions import MaintainTransactions
 
-
 load_dotenv()
 client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
 client = client_mongo[os.getenv("MONGO_DB")]
 transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
 budget_table = client[os.getenv("BUDGET_CLIENT")]
 
-external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]  # 'https://codepen.io/chriddyp/pen/bWLwgP.css'
+external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
+EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
+                                            'amount': [0], 'account': [''], 'notes': ['']})
 
 
 def zero_params_dict():
@@ -44,7 +46,7 @@ def zero_params_dict():
     return params_dict
 
 
-def make_plot_object(conf_dict):
+def make_trends_plot(conf_dict):
     """Make plot object from waveform parameters.
 
     Args:
@@ -56,12 +58,11 @@ def make_plot_object(conf_dict):
     # Generate figure
     fig_obj = go.Figure()
 
-    if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(transactions_table.find({'date': {
-            '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-            '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
-    else:
-        transactions = pd.DataFrame(transactions_table.find())
+    transactions = pd.DataFrame(transactions_table.find({'date': {
+        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
+        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
+    if len(transactions) == 0:
+        transactions = EMPTY_TRANSACTION
 
     if len(transactions) == 0:
         # TODO Error, no transactions found for the given filters
@@ -94,15 +95,11 @@ def make_plot_object(conf_dict):
 
 
 def make_table(conf_dict):
-    if conf_dict['start_date'] != 0:
-        transactions = pd.DataFrame(transactions_table.find({'date': {
-            '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-            '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
-    else:
-        transactions = pd.DataFrame([transactions_table.find_one()])
+    transactions = pd.DataFrame(transactions_table.find({'date': {
+        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
+        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
     if len(transactions) == 0:
-        transactions = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'], 'amount': [0],
-                                               'account': ['Na'], 'notes': ['']})
+        transactions = EMPTY_TRANSACTION
 
     transactions = transactions.drop(columns=['_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
@@ -131,6 +128,48 @@ def get_accounts_list():
     return acc_list
 
 
+def make_budget_plot(conf_dict):
+    budget_dict = {}
+    for item in budget_table.find():
+        budget_dict[item['category']] = item['value']
+
+    # TODO Limit the budget plot to only show one month
+    #  Or make it show month-to-month for each category
+    transactions = pd.DataFrame(transactions_table.find({'date': {
+        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
+        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
+    if len(transactions) == 0:
+        transactions = EMPTY_TRANSACTION
+
+    fig_obj = go.Figure()
+    for cat in budget_dict.keys():
+        spent = float(transactions[transactions['category'] == cat]['amount'].sum())
+        percent = -100 * spent / budget_dict[cat]
+        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside"))
+    fig_obj.update_xaxes(title_text="% Spent")
+
+    fig_obj.add_vline(x=100, line_width=3, line_color="white")
+    # TODO make a vertical line to show how far along you are in the month
+    #  fig_obj.add_vline(x=100, line_width=1, line_dash="dash", line_color="black")
+
+    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
+                         showgrid=True, gridwidth=1, gridcolor=colors['gridgray'])
+    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
+                         showgrid=False, gridwidth=1, gridcolor=colors['gridgray'])
+    fig_obj.update_layout(
+        font=dict(family='Times New Roman', size=15),
+        showlegend=False,
+        plot_bgcolor=colors['back2'],
+        paper_bgcolor=colors['back2'],
+        font_color=colors['text'],
+        margin_l=30, margin_r=30, margin_t=20, margin_b=20,
+    )
+
+    return fig_obj
+
+
 colors = {
     'navy': '#162956',
     'blue': '#2E5590',
@@ -153,7 +192,7 @@ colors = {
 current_config_dict = zero_params_dict()
 
 # Make initial plot
-fig = make_plot_object(current_config_dict)
+fig = make_trends_plot(current_config_dict)
 
 # Make initial table
 tab = make_table(current_config_dict)
@@ -168,9 +207,9 @@ app.layout = html.Div(
         html.Div(
             style={'background-color': 'grey'},
             children=[
-                html.Div(style={'width': '90px', 'display': 'inline-block', 'padding': '25px'},
+                html.Div(style={'width': 'auto', 'display': 'inline-block', 'padding': '25px'},
                          children=[html.Img(id='aloha_logo', src="assets/spearmint_tilted_mirror.png", height="90px")]),
-                html.H1(style={'width': '70%', 'color': 'white', 'display': 'inline-block'},
+                html.H1(style={'width': '70%', 'height': '90px', 'color': 'white', 'display': 'inline-block'},
                         children=['Spearmint Personal Finance Management']),
             ]
         ),
@@ -237,7 +276,7 @@ app.layout = html.Div(
                               html.Br(),
                               html.Div(style={'width': '90%', 'display': 'inline-block', 'padding': '0 20px',
                                               'vertical-align': 'middle'},
-                                       children=[dcc.Dropdown(id='account-dropdown', className='dropdown',
+                                       children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
                                                               style={'background-color': '#8A94AA'},
                                                               options=accounts_list)
                                                  ],
@@ -254,28 +293,63 @@ app.layout = html.Div(
                  ]),
 
         dcc.Tabs(id='selection_tabs', value='Trends', children=[
-                dcc.Tab(label="Trends", value='Trends', children=[
-                    html.Div(id="trends-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
-                             children=[
-                                 dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
-                                           id='money-graph', figure=fig),
-                             ]),
-                ]),
-                dcc.Tab(label="Transactions", value='Transactions', children=[
-                    html.Div(style={'width': '99%', 'height': '100%', 'float': 'left', 'background-color': colors.get('blue')},
-                             children=[html.Div(style={'height': '10px'}, id='blank-space'),
-                                       dag.AgGrid(id="transactions-table",
-                                                  style={"height": '600px'},
-                                                  rowData=tab.get('data'),
-                                                  columnDefs=tab.get('columns'),
-                                                  columnSize="autoSize"
-                                                  ),
-                                       html.Div(style={'height': '10px'}, id='blank-space-2')
-                                       ])
-                ]),
-                dcc.Tab(label="Budget", value='Budget', children=[
-                    'TODO: Budget']),
+            dcc.Tab(label="Trends", value='Trends', children=[
+                html.Div(id="trends-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
+                         children=[
+                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
+                                       id='trends-graph', figure=fig),
+                         ]),
             ]),
+            dcc.Tab(label="Transactions", value='Transactions', children=[
+                html.Div(style={'width': '99%', 'height': '100%', 'float': 'left', 'background-color': colors.get('blue')},
+                         children=[html.Div(style={'height': '10px'}, id='blank-space'),
+                                   dag.AgGrid(id="transactions-table",
+                                              style={"height": '600px'},
+                                              rowData=tab.get('data'),
+                                              columnDefs=tab.get('columns'),
+                                              columnSize="autoSize"
+                                              ),
+                                   html.Div(style={'height': '10px'}, id='blank-space-2')
+                                   ])
+            ]),
+            dcc.Tab(label="Budget", value='Budget', children=[
+                html.Div(id="budget-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
+                         children=[
+                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
+                                       id='budget-graph', figure=fig)]),
+                html.Div(id='budget-value-input-block', style={'width': '95%', 'height': '200px', 'float': 'left'},
+                         children=[
+                             html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left', 'width': '95%'},
+                                      children=[html.Button(id='new-budget-button', style={'backgroundColor': colors.get('navy'), 'width': 'auto'},
+                                                            children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
+                             dbc.Modal(id="budget-modal", is_open=False, children=[
+                                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                                     dbc.ModalBody(children=[
+                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                                  children=['Select budget category:',
+                                                            dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                                         style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px', 'vertical-align': 'middle'},
+                                                                         options=[''])]),
+                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                                  children=['Define budget amount:', html.Br(),
+                                                            dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                                         html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
+                                                  children=[dbc.Button(children=["Delete Budget ",
+                                                                                 html.I(className="fa-solid fa-trash-can", id='help-icon')],
+                                                                       id="modal-delete", color="danger", style={'float': 'right'})]),
+                                         html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
+                                     ]),
+                                     dbc.ModalFooter([
+                                         html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                                         dbc.Button(children=["Submit ",
+                                                              html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
+                                                    id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                                       ),
+                                 ]),
+                         ]),
+                html.Div(style={'height': '10px'}, id='blank-space-3')
+            ]),
+        ]),
     ]
 )
 
@@ -358,9 +432,10 @@ def update_plot_parameters(field_filter, time_filter, curr_params, start_date, e
 
 
 @app.callback(
-    Output('money-graph', 'figure'),
+    Output('trends-graph', 'figure'),
     Output('transactions-table', 'rowData'),
     Output('transactions-table', 'columnDefs'),
+    Output('budget-graph', 'figure'),
     Input('current-config-memory', 'data'),
     Input('selection_tabs', 'value')
 )
@@ -378,13 +453,56 @@ def update_tab_data(current_params, which_tab):
     """
     if which_tab == 'Trends':
         tab_dict = make_table(zero_params_dict())
-        return make_plot_object(current_params), tab_dict['data'], tab_dict['columns']
+        return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict())
     elif which_tab == 'Transactions':
         tab_dict = make_table(current_params)
-        return make_plot_object(zero_params_dict()), tab_dict['data'], tab_dict['columns']
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict())
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
-        return make_plot_object(zero_params_dict()), tab_dict['data'], tab_dict['columns']
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params)
+
+
+@app.callback(
+    Output("budget-modal", "is_open"),
+    Output('budget-category-dropdown', 'options'),
+    Output('budget-category-dropdown', 'value'),
+    Output('budget-value-input', 'value'),
+    Output('modal-body-text', 'children'),
+    Output('modal-delete', 'style'),
+    Input("new-budget-button", "n_clicks"),
+    Input("modal-cancel", "n_clicks"),
+    Input("modal-submit", "n_clicks"),
+    Input('budget-category-dropdown', 'value'),
+    Input('budget-value-input', 'value'),
+    Input('modal-delete', 'n_clicks')
+)
+def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_value, delete_button):
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    delete = {'display': 'none'}
+    if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value', 'budget-value-input.value']:
+        cat_list = list(transactions_table.find().distinct('category'))
+        if budget_category != 'Select category...':
+            bv = list(budget_table.find({'category': budget_category}))
+            if len(bv) > 0:
+                budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
+                delete = {'float': 'right'}
+            elif trigger == 'budget-category-dropdown.value':
+                budget_value = '$ 0'
+        return True, cat_list, budget_category, budget_value, '', delete
+    elif trigger == 'modal-submit.n_clicks':
+        cat_list = list(transactions_table.find().distinct('category'))
+        if budget_category != 'Select category...' and budget_value != '$ 0':
+            mt = MaintainTransactions()
+            mt.add_budget_item(budget_category, budget_value)
+            return False, [], 'Select category...', '$ 0', '', delete
+        else:
+            return True, cat_list, budget_category, budget_value, 'You must specify category and budget amount for that category', delete
+    elif trigger == 'modal-delete.n_clicks':
+        mt = MaintainTransactions()
+        mt.rm_budget_item(budget_category, budget_value)
+        return False, [], 'Select category...', '$ 0', '', delete
+    else:
+        return False, [], 'Select category...', '$ 0', '', delete
 
 
 @app.callback(
@@ -427,7 +545,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
             try:
                 m = pd.read_csv(StringIO(file_text))
             except:
-                msg.append(f"File {i+1}: File must be in CSV format\n")
+                msg.append(f"File {i + 1}: File must be in CSV format\n")
                 msg.append(html.Br())
                 continue
 
@@ -435,13 +553,13 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
             results = mt.add_transactions(m, account)
             if isinstance(results, int):
                 if results == 0:
-                    msg.append(f"File {i+1}: No new transactions to upload")
+                    msg.append(f"File {i + 1}: No new transactions to upload")
                     msg.append(html.Br())
                 else:
-                    msg.append(f"File {i+1}: Successfully uploaded {results} new transactions\n")
+                    msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
                     msg.append(html.Br())
             else:
-                msg.append(f"File {i+1}: {results}\n")
+                msg.append(f"File {i + 1}: {results}\n")
                 msg.append(html.Br())
     elif trigger == 'account-input.value':
         account_input = {'display': 'inline-block', 'width': '100%'}
