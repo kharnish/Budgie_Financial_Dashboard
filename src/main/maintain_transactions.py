@@ -2,6 +2,7 @@ import pandas as pd
 import pymongo
 from dotenv import load_dotenv
 import os
+from datetime import datetime
 
 
 class MaintainTransactions:
@@ -56,7 +57,6 @@ class MaintainTransactions:
 
             duplicates = list(self.transaction_table.find({'amount': row['amount'], 'original description': row['original description'],
                                                'account name': account}))
-
             if len(duplicates) > 0:
                 for dup in duplicates:
                     if dup['date'] == row['date']:
@@ -86,7 +86,16 @@ class MaintainTransactions:
                                'notes': ''}
         return default_transaction
 
+    def edit_transaction(self, change_dict):
+        """Update transaction based on edits in Transaction table"""
+        change_dict['data']['date'] = datetime.strptime('01-01-2024', '%m-%d-%Y')
+        new_dict = change_dict['data']
+        old_dict = change_dict['data'].copy()
+        old_dict[change_dict['colId']] = change_dict['oldValue']
+        return self.transaction_table.update_one(old_dict, {'$set': new_dict})
+
     def add_budget_item(self, category, value):
+        """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
         if len(existing) == 1:
             self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
@@ -94,6 +103,7 @@ class MaintainTransactions:
             self.budget_table.insert_one({'category': category, 'value': value})
 
     def rm_budget_item(self, category, value):
+        """Delete budget item in database"""
         self.budget_table.delete_one({'category': category, 'value': value})
 
 
