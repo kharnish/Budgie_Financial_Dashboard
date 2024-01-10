@@ -28,7 +28,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
                                             'amount': [0], 'account': [''], 'notes': ['']})
-
+mt = MaintainTransactions()
 
 def zero_params_dict():
     """Create empty dictionary with parameter keys.
@@ -115,8 +115,12 @@ def make_table(conf_dict):
             col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
         if col['field'] == 'category':
             col['width'] = 150
+            col['editable'] = True
+            col['cellEditor'] = 'agSelectCellEditor'
+            col['cellEditorParams'] = {'values': get_categories_list()}
         if col['field'] == 'description':
             col['width'] = 400
+            col['editable'] = True
         if col['field'] == 'account name':
             col['width'] = 300
     return {'data': data, 'columns': columns}
@@ -125,6 +129,12 @@ def make_table(conf_dict):
 def get_accounts_list():
     acc_list = list(transactions_table.find().distinct('account name'))
     acc_list.extend(['Add new account...'])
+    return acc_list
+
+
+def get_categories_list():
+    acc_list = list(transactions_table.find().distinct('category'))
+    acc_list.extend(['Add new category...'])
     return acc_list
 
 
@@ -492,13 +502,11 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     elif trigger == 'modal-submit.n_clicks':
         cat_list = list(transactions_table.find().distinct('category'))
         if budget_category != 'Select category...' and budget_value != '$ 0':
-            mt = MaintainTransactions()
             mt.add_budget_item(budget_category, budget_value)
             return False, [], 'Select category...', '$ 0', '', delete
         else:
             return True, cat_list, budget_category, budget_value, 'You must specify category and budget amount for that category', delete
     elif trigger == 'modal-delete.n_clicks':
-        mt = MaintainTransactions()
         mt.rm_budget_item(budget_category, budget_value)
         return False, [], 'Select category...', '$ 0', '', delete
     else:
@@ -549,7 +557,6 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            mt = MaintainTransactions()
             results = mt.add_transactions(m, account)
             if isinstance(results, int):
                 if results == 0:
@@ -566,6 +573,16 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
 
     return msg, upload_button, account_input, acc_list
+
+
+@app.callback(
+    Output('blank-space', 'children'),
+    Input('transactions-table', 'cellValueChanged')
+)
+def update_table_data(change_data):
+    if change_data:
+        mt.edit_transaction(change_data)
+    return ''
 
 
 if __name__ == '__main__':
