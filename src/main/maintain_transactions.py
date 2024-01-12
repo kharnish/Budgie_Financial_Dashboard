@@ -88,7 +88,7 @@ class MaintainTransactions:
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
-        change_dict['data']['date'] = datetime.strptime('01-01-2024', '%m-%d-%Y')
+        change_dict['data']['date'] = datetime.strptime(change_dict['data']['date'], '%m-%d-%Y')
         new_dict = change_dict['data']
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']

@@ -30,20 +30,41 @@ EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today
                                             'amount': [0], 'account': [''], 'notes': ['']})
 mt = MaintainTransactions()
 
+
 def zero_params_dict():
     """Create empty dictionary with parameter keys.
 
     Returns: Dictionary with all parameters set to 0.
 
     """
-    params = ['field_filter', 'time_filter', 'start_date', 'end_date']
-    params_dict = dict.fromkeys(params, 0)
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
-    params_dict['end_date'] = datetime.strftime(today, '%Y-%m-%d')
-    params_dict['start_date'] = datetime.strftime(start_of_month, '%Y-%m-%d')
+    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': get_categories_list(),
+            'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
-    return params_dict
+
+def get_mongo_transactions(conf_dict):
+    """Query Mongo according to configuration dict parameters
+
+    Args:
+         conf_dict:
+
+    Returns: Pandas Dataframe of transactions
+    """
+    if len(conf_dict['filter_value']) == 0:
+        mongo_filter = {}
+    else:
+        mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
+
+    transactions = pd.DataFrame(transactions_table.find({
+        'date': {
+            '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
+            '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
+        **mongo_filter}))
+    if len(transactions) == 0:
+        transactions = EMPTY_TRANSACTION
+
+    return transactions
 
 
 def make_trends_plot(conf_dict):
@@ -58,22 +79,18 @@ def make_trends_plot(conf_dict):
     # Generate figure
     fig_obj = go.Figure()
 
-    transactions = pd.DataFrame(transactions_table.find({'date': {
-        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
-    if len(transactions) == 0:
-        transactions = EMPTY_TRANSACTION
+    transactions = get_mongo_transactions(conf_dict)
 
     if len(transactions) == 0:
         # TODO Error, no transactions found for the given filters
         fig_obj.add_trace(go.Bar(x=[0], y=[0]))
-    elif conf_dict['field_filter'] == 0:
+    elif conf_dict['field_filter'] == 'Category':
         for cat, grp in transactions.groupby('category'):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Category")
-    elif conf_dict['field_filter'] == 1:
-        for cat, grp in transactions.groupby('account name'):
-            fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
+    elif conf_dict['field_filter'] == 'Account':
+        for acc, grp in transactions.groupby('account name'):
+            fig_obj.add_trace(go.Bar(x=[acc], y=[grp['amount'].sum()], name=acc))
         fig_obj.update_xaxes(title_text="Account")
 
     fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
@@ -95,12 +112,7 @@ def make_trends_plot(conf_dict):
 
 
 def make_table(conf_dict):
-    transactions = pd.DataFrame(transactions_table.find({'date': {
-        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
-    if len(transactions) == 0:
-        transactions = EMPTY_TRANSACTION
-
+    transactions = get_mongo_transactions(conf_dict)
     transactions = transactions.drop(columns=['_id'])
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
@@ -117,7 +129,7 @@ def make_table(conf_dict):
             col['width'] = 150
             col['editable'] = True
             col['cellEditor'] = 'agSelectCellEditor'
-            col['cellEditorParams'] = {'values': get_categories_list()}
+            col['cellEditorParams'] = {'values': get_categories_list('new')}
         if col['field'] == 'description':
             col['width'] = 400
             col['editable'] = True
@@ -126,16 +138,24 @@ def make_table(conf_dict):
     return {'data': data, 'columns': columns}
 
 
-def get_accounts_list():
-    acc_list = list(transactions_table.find().distinct('account name'))
-    acc_list.extend(['Add new account...'])
+def get_accounts_list(extra=''):
+    acc_list = []
+    if extra == 'new':
+        acc_list = list(transactions_table.find().distinct('account name'))
+        acc_list.extend(['Add new account...'])
+    else:
+        acc_list.extend(transactions_table.find().distinct('account name'))
     return acc_list
 
 
-def get_categories_list():
-    acc_list = list(transactions_table.find().distinct('category'))
-    acc_list.extend(['Add new category...'])
-    return acc_list
+def get_categories_list(extra=''):
+    cat_list = []
+    if extra == 'new':
+        cat_list = list(transactions_table.find().distinct('category'))
+        cat_list.extend(['Add new category...'])
+    else:
+        cat_list.extend(transactions_table.find().distinct('category'))
+    return cat_list
 
 
 def make_budget_plot(conf_dict):
@@ -208,7 +228,7 @@ fig = make_trends_plot(current_config_dict)
 tab = make_table(current_config_dict)
 
 # Get accounts list
-accounts_list = get_accounts_list()
+accounts_list = get_accounts_list('new')
 
 # Layout app window
 app.layout = html.Div(
@@ -225,20 +245,30 @@ app.layout = html.Div(
         ),
         html.Div(id="input-params", style={'width': '24%', 'float': 'left'},
                  children=[
-                     dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
-                                       children=["Filter Configurations"]),
-                              html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '20px 20px 25px 20px'},
+                     dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
+                                       children=["Configurations"]),
+                              html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                                        children=["Sort By"]),
                               html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='field-dropdown', value=current_config_dict['field_filter'],
                                                               clearable=False, searchable=False, className='dropdown',
                                                               style={'background-color': '#8A94AA'},
-                                                              options=[
-                                                                  {'label': 'Category', 'value': '0'},
-                                                                  {'label': 'Account', 'value': '1'},
-                                                              ], ),
+                                                              options=['Category', 'Account'],
+                                                              ),
                                                  ]
+                                       ),
+                              ]),
+                     dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                                       children=['Select Filter']),
+                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                                              'vertical-align': 'middle'},
+                                       children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
+                                                              searchable=True, className='dropdown', multi=True,
+                                                              style={'background-color': '#8A94AA'},
+                                                              options=get_categories_list(),
+                                                              )
+                                                 ],
                                        ),
                               ]),
                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
@@ -248,14 +278,9 @@ app.layout = html.Div(
                                        children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'], maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
                                                               style={'background-color': '#8A94AA'},
-                                                              options=[
-                                                                  {'label': 'This Month', 'value': '0'},
-                                                                  {'label': 'Last Month', 'value': '1'},
-                                                                  {'label': 'This Year', 'value': '2'},
-                                                                  {'label': 'Last Year', 'value': '3'},
-                                                                  {'label': 'All Time', 'value': '4'},
-                                                                  {'label': 'Custom', 'value': '5'},
-                                                              ], )
+                                                              options=['This Month', 'Last Month', 'This Year', 'Last Year',
+                                                                       'All Time', 'Custom'],
+                                                              )
                                                  ],
                                        ),
                               ]),
@@ -293,11 +318,12 @@ app.layout = html.Div(
                                        ),
                               ]),
                      html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
-                              children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'}, placeholder='New account name')], ),
+                              children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
+                                                  placeholder='New account name')], ),
                      html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
-                              children=[dcc.Upload(id='upload-data', multiple=True, children=[html.Button('Select Transaction CSV',
-                                                                                                          style={'backgroundColor': colors.get('navy')})])]),
+                              children=[dcc.Upload(id='upload-data', multiple=True,
+                                                   children=[html.Button('Select Transaction CSV', style={'backgroundColor': colors.get('navy')})])]),
                      html.I(id='upload-message',
                             style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
                  ]),
@@ -369,20 +395,23 @@ app.layout = html.Div(
     Output('current-config-memory', 'data'),
     Output('field-dropdown', 'value'),
     Output('time-dropdown', 'value'),
+    Output('filter-dropdown', 'options'),
     Output('date-range', 'style'),
 
     Input('field-dropdown', 'value'),
     Input('time-dropdown', 'value'),
+    Input('filter-dropdown', 'value'),
     Input('current-config-memory', 'data'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
 )
-def update_plot_parameters(field_filter, time_filter, curr_params, start_date, end_date):
+def update_plot_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
         field_filter: Category filter
         time_filter: Time window filter
+        filter_values: Filter to apply to transaction categories or accounts
         curr_params: Dictionary of current parameters
         end_date: end date of time window to show
         start_date: start date of time window to show
@@ -398,47 +427,54 @@ def update_plot_parameters(field_filter, time_filter, curr_params, start_date, e
         curr_params = zero_params_dict()
     new_params = curr_params
 
-    if curr_params['time_filter'] == '5':
+    if curr_params['time_filter'] == 'Custom':
         date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     else:
         date_range_style = {'display': 'none'}
 
     # if one of the parameters, change them in the current dict
     if trigger == 'field-dropdown.value':
-        new_params['field_filter'] = int(field_filter) if field_filter else 0
+        new_params['field_filter'] = field_filter
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
-        if time_filter == '0':  # This Month
+        if time_filter == 'This Month':
             today = date.today()
             new_params['start_date'] = date(today.year, today.month, 1)
             new_params['end_date'] = date.today()
             date_range_style = {'display': 'none'}
-        elif time_filter == '1':  # Last Month
+        elif time_filter == 'Last Month':
             today = date.today()
             new_params['end_date'] = date(today.year, today.month, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1)
             date_range_style = {'display': 'none'}
-        elif time_filter == '2':  # This Year
+        elif time_filter == 'This Year':
             today = date.today()
             new_params['end_date'] = today
             new_params['start_date'] = date(today.year, 1, 1)
             date_range_style = {'display': 'none'}
-        elif time_filter == '3':  # Last Year
+        elif time_filter == 'Last Year':
             today = date.today()
             new_params['end_date'] = date(today.year, 1, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
             date_range_style = {'display': 'none'}
-        elif time_filter == '4':  # All Time
+        elif time_filter == 'All Time':
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(2000, 1, 1)
             date_range_style = {'display': 'none'}
-        elif time_filter == '5':
+        elif time_filter == 'Custom':
             date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
+    elif trigger == 'filter-dropdown.value':
+        new_params['filter_value'] = filter_values
 
-    return new_params, new_params['field_filter'], new_params['time_filter'], date_range_style
+    if new_params['field_filter'] == 'Account':
+        filter_dropdown = get_accounts_list()
+    else:
+        filter_dropdown = get_categories_list()
+
+    return new_params, new_params['field_filter'], new_params['time_filter'], filter_dropdown, date_range_style
 
 
 @app.callback(
@@ -535,7 +571,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
     upload_button = {'display': 'none'}
     msg = ''
     account_input = {'display': 'none'}
-    acc_list = get_accounts_list()
+    acc_list = get_accounts_list('new')
 
     trigger = dash.callback_context.triggered[0]['prop_id']
     if trigger == 'account-dropdown.value':
