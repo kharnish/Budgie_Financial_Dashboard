@@ -23,11 +23,11 @@ client = client_mongo[os.getenv("MONGO_DB")]
 transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
 budget_table = client[os.getenv("BUDGET_CLIENT")]
 
-external_stylesheets = ['assets/spearmint.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
+external_stylesheets = ['assets/budgie_light.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
-                                            'amount': [0], 'account': [''], 'notes': ['']})
+                                            'amount': [0], 'account name': [''], 'notes': ['']})
 mt = MaintainTransactions()
 
 
@@ -39,7 +39,7 @@ def zero_params_dict():
     """
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
-    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': get_categories_list(),
+    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': [],
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
 
@@ -88,24 +88,24 @@ def make_trends_plot(conf_dict):
         for cat, grp in transactions.groupby('category'):
             fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
         fig_obj.update_xaxes(title_text="Category")
-    elif conf_dict['field_filter'] == 'Account':
+    elif conf_dict['field_filter'] == 'Account Name':
         for acc, grp in transactions.groupby('account name'):
             fig_obj.add_trace(go.Bar(x=[acc], y=[grp['amount'].sum()], name=acc))
-        fig_obj.update_xaxes(title_text="Account")
+        fig_obj.update_xaxes(title_text="Account Name")
 
-    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
-                         showgrid=True, gridwidth=1, gridcolor=colors['gridgray'])
+    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
     fig_obj.update_yaxes(title_text="Amount ($)",
-                         showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
-                         showgrid=True, gridwidth=1, gridcolor=colors['gridgray'])
+                         showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
     fig_obj.update_layout(
-        font=dict(family='Times New Roman', size=15),
+        font=dict(family='Arial', size=15),
         # showlegend=False,
-        plot_bgcolor=colors['back2'],
-        paper_bgcolor=colors['back2'],
-        font_color=colors['text'],
+        plot_bgcolor=colors['light'].get('background'),
+        paper_bgcolor=colors['light'].get('background'),
+        font_color=colors['light'].get('text'),
         margin_l=30, margin_r=30, margin_t=20, margin_b=20,
     )
     return fig_obj
@@ -114,6 +114,7 @@ def make_trends_plot(conf_dict):
 def make_table(conf_dict):
     transactions = get_mongo_transactions(conf_dict)
     transactions = transactions.drop(columns=['_id'])
+    transactions = transactions.sort_values('date', ascending=False)
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
     columns = [{"field": i, 'filter': True, "resizable": True, 'sortable': True} for i in transactions.columns]
@@ -178,22 +179,21 @@ def make_budget_plot(conf_dict):
         fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside"))
     fig_obj.update_xaxes(title_text="% Spent")
 
-    fig_obj.add_vline(x=100, line_width=3, line_color="white")
-    # TODO make a vertical line to show how far along you are in the month
-    #  fig_obj.add_vline(x=100, line_width=1, line_dash="dash", line_color="black")
+    fig_obj.add_vline(x=100, line_width=3, line_color=colors['light'].get('gridgray'))
+    # TODO make a vertical line on each bar to show how far along you are in the month
 
-    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
-                         showgrid=True, gridwidth=1, gridcolor=colors['gridgray'])
-    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['linegray'],
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['gridgray'],
-                         showgrid=False, gridwidth=1, gridcolor=colors['gridgray'])
+    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
+    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=False, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
     fig_obj.update_layout(
-        font=dict(family='Times New Roman', size=15),
+        font=dict(family='Arial', size=15),
         showlegend=False,
-        plot_bgcolor=colors['back2'],
-        paper_bgcolor=colors['back2'],
-        font_color=colors['text'],
+        plot_bgcolor=colors['light'].get('background'),
+        paper_bgcolor=colors['light'].get('background'),
+        font_color=colors['light'].get('text'),
         margin_l=30, margin_r=30, margin_t=20, margin_b=20,
     )
 
@@ -201,19 +201,17 @@ def make_budget_plot(conf_dict):
 
 
 colors = {
-    'navy': '#162956',
-    'blue': '#2E5590',
-    'lightblue': '#6DA9CF',
-    'gray': '#4C4F59',
-    'linegray': '#7f7f7f',  # 127
-    'gridgray': '#646464',  # 100
-    'yellow': '#FAB208',
-    'back0': '#020409',
-    'back1': '#060c19',
-    'back2': '#0a1429',
-    'back3': '#0e1b39',
-    'back4': '#112348',
-    'text': '#EAEAEA',
+    'light': {
+        'gridgray': '#646464',
+        'yellow': '#faec59',
+        'background': 'white',
+        'text': '#162432',
+    },
+    'dark': {
+        'background': '#0a1429',
+        'linegray': '#7f7f7f',
+        'text': '#EAEAEA',
+    }
 }
 
 ########################################################################################
@@ -234,38 +232,37 @@ accounts_list = get_accounts_list('new')
 app.layout = html.Div(
     children=[
         dcc.Store(id='current-config-memory'),
-        html.Div(
-            style={'background-color': 'grey'},
-            children=[
-                html.Div(style={'width': 'auto', 'display': 'inline-block', 'padding': '25px'},
-                         children=[html.Img(id='aloha_logo', src="assets/spearmint_tilted_mirror.png", height="90px")]),
-                html.H1(style={'width': '70%', 'height': '90px', 'color': 'white', 'display': 'inline-block'},
-                        children=['Spearmint Personal Finance Management']),
-            ]
-        ),
+
+        html.Div(style={'background-color': '#2C4864'},
+                 children=[
+                     html.Div(style={'width': 'auto', 'display': 'inline-block', 'padding': '25px 40px'},
+                              children=[html.Img(id='logo', src="assets/parakeet.png", height="90px")]),
+                     html.Div(style={'position': 'absolute', 'left': '145px', 'top': '60px'},
+                              children=[html.H1(['Budgie Financial Dashboard'])]),
+                 ]),
+
+        html.Div(id='blank-space', style={'padding': '0px 20px 20px 20px'}),  # a little space between header and body
         html.Div(id="input-params", style={'width': '24%', 'float': 'left'},
                  children=[
-                     dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                       children=["Configurations"]),
-                              html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                     dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
+                                      children=["Configurations"]),
+                              html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
                                        children=["Sort By"]),
-                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                              html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='field-dropdown', value=current_config_dict['field_filter'],
                                                               clearable=False, searchable=False, className='dropdown',
-                                                              style={'background-color': '#8A94AA'},
-                                                              options=['Category', 'Account'],
+                                                              options=['Category', 'Account Name'],
                                                               ),
                                                  ]
                                        ),
                               ]),
                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                                        children=['Select Filter']),
-                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                              html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
                                                               searchable=True, className='dropdown', multi=True,
-                                                              style={'background-color': '#8A94AA'},
                                                               options=get_categories_list(),
                                                               )
                                                  ],
@@ -273,11 +270,10 @@ app.layout = html.Div(
                               ]),
                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                                        children=['Time Window']),
-                              html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '0px',
+                              html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'], maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
-                                                              style={'background-color': '#8A94AA'},
                                                               options=['This Month', 'Last Month', 'This Year', 'Last Year',
                                                                        'All Time', 'Custom'],
                                                               )
@@ -293,9 +289,9 @@ app.layout = html.Div(
                                   end_date=date.today()
                               )]),
 
-                     html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px', 'color': '#969696'}, ),
+                     html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px'}),
 
-                     html.Div('', style={'padding': '0px 20px 20px 20px'}, ),  # seems to work better than html.Br()
+                     html.Div('', style={'padding': '0px 20px 20px 20px'}),  # seems to work better than html.Br()
                      dbc.Row([html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
                                        children=['Select Account to Upload Transactions  ',
                                                  html.I(className="fa-solid fa-circle-info", id='help-icon'),
@@ -309,10 +305,9 @@ app.layout = html.Div(
                                                              style={'font-size': 14, 'maxWidth': 800, 'width': 800},
                                                              )]),
                               html.Br(),
-                              html.Div(style={'width': '90%', 'display': 'inline-block', 'padding': '0 20px',
+                              html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
-                                                              style={'background-color': '#8A94AA'},
                                                               options=accounts_list)
                                                  ],
                                        ),
@@ -323,69 +318,67 @@ app.layout = html.Div(
                      html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
                               children=[dcc.Upload(id='upload-data', multiple=True,
-                                                   children=[html.Button('Select Transaction CSV', style={'backgroundColor': colors.get('navy')})])]),
+                                                   children=[html.Button('Select Transaction CSV')])]),
                      html.I(id='upload-message',
-                            style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
+                            style={'display': 'inline-block', 'padding': '0px 20px 20px 21px'}),
                  ]),
 
         dcc.Tabs(id='selection_tabs', value='Trends', children=[
             dcc.Tab(label="Trends", value='Trends', children=[
-                html.Div(id="trends-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
-                         children=[
-                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
-                                       id='trends-graph', figure=fig),
-                         ]),
+                html.Div(id="trends-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
+                         children=[dcc.Graph(style={'width': '95%', 'height': '600px', 'padding': '10px 20px', 'align': 'center'},
+                                             id='trends-graph', figure=fig),
+                                   ]),
+                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
             ]),
             dcc.Tab(label="Transactions", value='Transactions', children=[
-                html.Div(style={'width': '99%', 'height': '100%', 'float': 'left', 'background-color': colors.get('blue')},
-                         children=[html.Div(style={'height': '10px'}, id='blank-space'),
-                                   dag.AgGrid(id="transactions-table",
+                html.Div(style={'width': '100%', 'height': '100%', 'float': 'left'}, className='tab-body',
+                         children=[dag.AgGrid(id="transactions-table",
                                               style={"height": '600px'},
                                               rowData=tab.get('data'),
                                               columnDefs=tab.get('columns'),
                                               columnSize="autoSize"
                                               ),
-                                   html.Div(style={'height': '10px'}, id='blank-space-2')
-                                   ])
+                                   ]),
+                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-2b')
             ]),
-            dcc.Tab(label="Budget", value='Budget', children=[
-                html.Div(id="budget-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
+            dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
+                html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
                          children=[
-                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px', 'align': 'center'},
-                                       id='budget-graph', figure=fig)]),
-                html.Div(id='budget-value-input-block', style={'width': '95%', 'height': '200px', 'float': 'left'},
-                         children=[
-                             html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left', 'width': '95%'},
-                                      children=[html.Button(id='new-budget-button', style={'backgroundColor': colors.get('navy'), 'width': 'auto'},
+                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
+                                       id='budget-graph', figure=fig),
+                             html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
+                                      children=[html.Button(id='new-budget-button', style={'width': 'auto'},
                                                             children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
                              dbc.Modal(id="budget-modal", is_open=False, children=[
-                                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
-                                     dbc.ModalBody(children=[
-                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
-                                                  children=['Select budget category:',
-                                                            dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
-                                                                         style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px', 'vertical-align': 'middle'},
-                                                                         options=[''])]),
-                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
-                                                  children=['Define budget amount:', html.Br(),
-                                                            dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                         html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
-                                                  children=[dbc.Button(children=["Delete Budget ",
-                                                                                 html.I(className="fa-solid fa-trash-can", id='help-icon')],
-                                                                       id="modal-delete", color="danger", style={'float': 'right'})]),
-                                         html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
-                                     ]),
-                                     dbc.ModalFooter([
-                                         html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
-                                         dbc.Button(children=["Submit ",
-                                                              html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
-                                                    id="modal-submit", className="ms-auto", style={'float': 'left'})]
-                                       ),
+                                 dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                                 dbc.ModalBody(children=[
+                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                              children=['Select budget category:',
+                                                        dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                                     style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
+                                                                     options=[''])]),
+                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                              children=['Define budget amount:', html.Br(),
+                                                        dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                                     html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
+                                              children=[dbc.Button(children=["Delete Budget ",
+                                                                             html.I(className="fa-solid fa-trash-can", id='help-icon')],
+                                                                   id="modal-delete", color="danger", style={'float': 'right'})]),
+                                     html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
                                  ]),
+                                 dbc.ModalFooter([
+                                     html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                                     dbc.Button(children=["Submit ",
+                                                          html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
+                                                id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                                 ),
+                             ]),
                          ]),
-                html.Div(style={'height': '10px'}, id='blank-space-3')
+                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
             ]),
         ]),
+        html.Div(style={'padding': '0px 20px 20px 20px'})
     ]
 )
 
@@ -466,13 +459,14 @@ def update_plot_parameters(field_filter, time_filter, filter_values, curr_params
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
-    elif trigger == 'filter-dropdown.value':
-        new_params['filter_value'] = filter_values
 
-    if new_params['field_filter'] == 'Account':
+    if new_params['field_filter'] == 'Account Name':
         filter_dropdown = get_accounts_list()
     else:
         filter_dropdown = get_categories_list()
+
+    if trigger == 'filter-dropdown.value':
+        new_params['filter_value'] = filter_values
 
     return new_params, new_params['field_filter'], new_params['time_filter'], filter_dropdown, date_range_style
 
