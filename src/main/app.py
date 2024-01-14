@@ -39,7 +39,7 @@ def zero_params_dict():
     """
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
-    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': get_categories_list(),
+    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': [],
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
 
@@ -114,6 +114,7 @@ def make_trends_plot(conf_dict):
 def make_table(conf_dict):
     transactions = get_mongo_transactions(conf_dict)
     transactions = transactions.drop(columns=['_id'])
+    transactions = transactions.sort_values('date', ascending=False)
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
     columns = [{"field": i, 'filter': True, "resizable": True, 'sortable': True} for i in transactions.columns]
@@ -466,8 +467,6 @@ def update_plot_parameters(field_filter, time_filter, filter_values, curr_params
 
     if trigger == 'filter-dropdown.value':
         new_params['filter_value'] = filter_values
-    else:
-        new_params['filter_value'] = filter_dropdown
 
     return new_params, new_params['field_filter'], new_params['time_filter'], filter_dropdown, date_range_style
 
