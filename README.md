@@ -1,6 +1,8 @@
-# Spearmint Money Management
+# Budgie Financial Dashboard
 
-_A quick visualizer to get a hold on your personal finances._
+_A quick visualizer to monitor your personal finances._
+
+Process your bank transactions in a locally-hosted database to get an overview of your spending, categorize transactions, and define budget areas.
 
 ## Usage
 Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
