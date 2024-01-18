@@ -365,9 +365,11 @@ app.layout = html.Div(
                 html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
                          children=[
                              html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
-                                      children=[html.Button(children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
+                                      children=[html.Button(style={'width': '75px', 'padding': '0'},
+                                                            children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
                              html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
-                                      children=[html.Button(children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
+                                      children=[html.Button(style={'width': '75px', 'padding': '0'},
+                                                            children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
                              html.Div(id="trends-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
                                       children=[dcc.Graph(id='trends-graph', style={'height': '600px'}, figure=fig)]),
                              html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
