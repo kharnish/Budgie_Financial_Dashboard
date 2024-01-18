@@ -21,7 +21,7 @@ Type your desired account name and instantiate that account by selecting a trans
 Once the account is logged in your database, you can upload more transactions CSV files under that account. 
 You can select multiple files to upload simultaneously for the same account.
 
-To load a transaction file which contains multiple accounts (i.e. from from Mint), ensure there is an `account_name` column
+To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
 in the CSV file and simply leave the "New account name" input empty when uploading the file.
 
 Once you categorize the transactions, you can add a budget and see your current status for different categories in the Budget tab.
