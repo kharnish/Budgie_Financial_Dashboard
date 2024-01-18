@@ -7,6 +7,7 @@ import dash
 import dash_bootstrap_components as dbc
 from dash import Dash, callback, dcc, html, Input, Output
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
 import pymongo
 from datetime import date, datetime, timedelta
@@ -30,6 +31,8 @@ EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today
                                             'amount': [0], 'account name': [''], 'notes': ['']})
 mt = MaintainTransactions()
 
+EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
+
 
 def zero_params_dict():
     """Create empty dictionary with parameter keys.
@@ -39,7 +42,7 @@ def zero_params_dict():
     """
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
-    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': [],
+    return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': [], 'plot_type': 'bar',
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
 
@@ -76,28 +79,65 @@ def make_trends_plot(conf_dict):
     Returns: Plotly figure object.
 
     """
-    # Generate figure
-    fig_obj = go.Figure()
-
     transactions = get_mongo_transactions(conf_dict)
+    transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
 
-    if len(transactions) == 0:
-        # TODO Error, no transactions found for the given filters
-        fig_obj.add_trace(go.Bar(x=[0], y=[0]))
-    elif conf_dict['field_filter'] == 'Category':
-        for cat, grp in transactions.groupby('category'):
-            fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
-        fig_obj.update_xaxes(title_text="Category")
-    elif conf_dict['field_filter'] == 'Account Name':
-        for acc, grp in transactions.groupby('account name'):
-            fig_obj.add_trace(go.Bar(x=[acc], y=[grp['amount'].sum()], name=acc))
-        fig_obj.update_xaxes(title_text="Account Name")
+    if conf_dict['plot_type'] == 'bar':
+        fig_obj = go.Figure()
+        if len(transactions) == 0:
+            # TODO Error, no transactions found for the given filters
+            fig_obj.add_trace(go.Bar(x=[0], y=[0]))
+        else:
+            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
+                amount = grp['amount'].sum()
+                if amount <= 0:
+                    label = 'Spending'
+                    amount = -amount
+                else:
+                    label = 'Income'
+                fig_obj.add_trace(go.Bar(y=[label], x=[amount], name=cat, orientation='h', meta=cat,
+                                         hovertemplate="%{meta}<br>$%{x:.2f}<extra></extra>"))
+            fig_obj.update_yaxes(title_text="Expenditures")
+
+        fig_obj.update_xaxes(title_text="Amount ($)")
+        fig_obj.update_layout(barmode='stack')
+
+    elif conf_dict['plot_type'] == 'pie':
+        fig_obj = make_subplots(rows=1, cols=2, subplot_titles=['Income', 'Spending'], specs=[[{'type': 'domain'}, {'type': 'domain'}]])
+        if len(transactions) == 0:
+            # TODO Error, no transactions found for the given filters
+            fig_obj.add_trace(go.Bar(x=[0], y=[0]))
+        else:
+            lab_val = {'Spending': {'labels': [], 'values': []},
+                       'Income': {'labels': [], 'values': []}}
+            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
+                amount = grp['amount'].sum()
+                if amount <= 0:
+                    lab_val['Spending']['labels'].append(cat)
+                    lab_val['Spending']['values'].append(-amount)
+                else:
+                    lab_val['Income']['labels'].append(cat)
+                    lab_val['Income']['values'].append(amount)
+            # TODO try and figure out a better hover label for the plots
+            fig_obj.add_trace(go.Pie(labels=lab_val['Income']['labels'], values=lab_val['Income']['values'], textinfo='percent+label',
+                                     meta=lab_val['Income']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 1)
+            fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'], textinfo='percent+label',
+                                     meta=lab_val['Spending']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 2)
+
+    # # Individual Bar Plot
+    # if len(transactions) == 0:
+    #     # TODO Error, no transactions found for the given filters
+    #     fig_obj.add_trace(go.Bar(x=[0], y=[0]))
+    # else:
+    #     for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()'):
+    #         fig_obj.add_trace(go.Bar(x=[cat], y=[grp['amount'].sum()], name=cat))
+    #     fig_obj.update_xaxes(title_text=conf_dict['field_filter']")
+    # fig_obj.update_yaxes(title_text="Amount ($)")
 
     fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
                          zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
                          showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
-    fig_obj.update_yaxes(title_text="Amount ($)",
-                         showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
                          zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
                          showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
     fig_obj.update_layout(
@@ -166,17 +206,15 @@ def make_budget_plot(conf_dict):
 
     # TODO Limit the budget plot to only show one month
     #  Or make it show month-to-month for each category
-    transactions = pd.DataFrame(transactions_table.find({'date': {
-        '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-        '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')}}))
-    if len(transactions) == 0:
-        transactions = EMPTY_TRANSACTION
+    transactions = get_mongo_transactions(conf_dict)
 
     fig_obj = go.Figure()
     for cat in budget_dict.keys():
         spent = float(transactions[transactions['category'] == cat]['amount'].sum())
         percent = -100 * spent / budget_dict[cat]
-        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside"))
+        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside",
+                                 meta=[f"$ {budget_dict[cat]:.2f}"],
+                                 hovertemplate="Spent:       %{text}<br>Budgeted: %{meta}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
 
     fig_obj.add_vline(x=100, line_width=3, line_color=colors['light'].get('gridgray'))
@@ -315,31 +353,36 @@ app.layout = html.Div(
                      html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
                               children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
                                                   placeholder='New account name')], ),
-                     html.Div('', style={'padding': '0px 20px 10px 20px'}),
                      html.Div(style={'display': 'inline-block'},
                               children=[dcc.Upload(id='upload-data', multiple=True,
                                                    children=[html.Button('Select Transaction CSV')])]),
                      html.I(id='upload-message',
-                            style={'display': 'inline-block', 'padding': '0px 20px 20px 21px'}),
+                            style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                  ]),
 
         dcc.Tabs(id='selection_tabs', value='Trends', children=[
             dcc.Tab(label="Trends", value='Trends', children=[
-                html.Div(id="trends-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
-                         children=[dcc.Graph(style={'width': '95%', 'height': '600px', 'padding': '10px 20px', 'align': 'center'},
-                                             id='trends-graph', figure=fig),
-                                   ]),
-                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
+                html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
+                         children=[
+                             html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
+                                      children=[html.Button(children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
+                             html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
+                                      children=[html.Button(children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
+                             html.Div(id="trends-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
+                                      children=[dcc.Graph(id='trends-graph', style={'height': '600px'}, figure=fig)]),
+                             html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
+                         ]),
             ]),
             dcc.Tab(label="Transactions", value='Transactions', children=[
                 html.Div(style={'width': '100%', 'height': '100%', 'float': 'left'}, className='tab-body',
-                         children=[dag.AgGrid(id="transactions-table",
-                                              style={"height": '600px'},
-                                              rowData=tab.get('data'),
-                                              columnDefs=tab.get('columns'),
-                                              columnSize="autoSize"
-                                              ),
-                                   ]),
+                         children=[
+                             dag.AgGrid(id="transactions-table",
+                                        style={"height": '600px'},
+                                        rowData=tab.get('data'),
+                                        columnDefs=tab.get('columns'),
+                                        columnSize="autoSize"
+                                        ),
+                         ]),
                 html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-2b')
             ]),
             dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
@@ -397,8 +440,10 @@ app.layout = html.Div(
     Input('current-config-memory', 'data'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
+    Input('pie-button', 'n_clicks'),
+    Input('bar-button', 'n_clicks'),
 )
-def update_plot_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date):
+def update_plot_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date, bar_button, pie_button):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
@@ -459,6 +504,11 @@ def update_plot_parameters(field_filter, time_filter, filter_values, curr_params
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
+
+    elif trigger == 'pie-button.n_clicks':
+        curr_params['plot_type'] = 'pie'
+    elif trigger == 'bar-button.n_clicks':
+        curr_params['plot_type'] = 'bar'
 
     if new_params['field_filter'] == 'Account Name':
         filter_dropdown = get_accounts_list()
@@ -579,7 +629,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         msg = []
         for i, file in enumerate(loaded_file):
             decodedBytes = base64.b64decode(file.split(',')[-1])
-            file_text = decodedBytes.decode("ascii")
+            file_text = decodedBytes.decode("utf-8")
             try:
                 m = pd.read_csv(StringIO(file_text))
             except:

@@ -20,7 +20,25 @@ class MaintainTransactions:
         else:
             df = sheet
 
+        # Extra check if it's a venmo CSV
+        if df.columns[1] == 'Unnamed: 1':
+            if isinstance(sheet, str):
+                df = pd.read_csv(sheet, header=2)
+                df.drop(0, inplace=True)
+            else:
+                df = sheet
+                df.columns = df.iloc[1]
+                df.drop([0, 1, 2], inplace=True)
+                df = df.reset_index(drop=True)
+
+            df.drop(len(df)-1, inplace=True)
+            df = df.rename(columns={'Datetime': 'date', 'Note': 'description', 'Amount (total)': 'amount'})
+            df['amount'] = [val.split('$')[1] for val in df['amount']]
+            df['amount'] = df['amount'].astype(float)
+            df['date'] = [val.split('T')[0] for val in df['date']]
+
         # Standardize sheet columns
+        df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
         if 'transaction date' in df.columns:
             df = df.rename(columns={'transaction date': 'date'})
@@ -56,7 +74,7 @@ class MaintainTransactions:
                 account = row['account name']
 
             duplicates = list(self.transaction_table.find({'amount': row['amount'], 'original description': row['original description'],
-                                               'account name': account}))
+                                                           'account name': account}))
             if len(duplicates) > 0:
                 for dup in duplicates:
                     if dup['date'] == row['date']:
