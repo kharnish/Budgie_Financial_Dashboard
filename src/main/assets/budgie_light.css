@@ -236,3 +236,8 @@ input::-webkit-inner-spin-button {
     border-left: 1px solid;
     border-bottom: 1px solid;
 }
+.modal-title{
+    margin-bottom: 0;
+    line-height: var(--bs-modal-title-line-height);
+    font-weight: bold;
+}
