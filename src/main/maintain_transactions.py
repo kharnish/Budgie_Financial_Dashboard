@@ -31,7 +31,7 @@ class MaintainTransactions:
                 df.drop([0, 1, 2], inplace=True)
                 df = df.reset_index(drop=True)
 
-            df.drop(len(df)-1, inplace=True)
+            df.drop(len(df) - 1, inplace=True)
             df = df.rename(columns={'Datetime': 'date', 'Note': 'description', 'Amount (total)': 'amount'})
             df['amount'] = [val.split('$')[1] for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
@@ -90,6 +90,18 @@ class MaintainTransactions:
         if len(transaction_list) > 0:
             self.transaction_table.insert_many(transaction_list)
         return len(transaction_list)
+
+    def add_one_transaction(self, category, amount, t_date, description, account):
+        """Add a single manual transaction to the database"""
+        transaction = {'date': datetime.strptime(t_date, '%Y-%m-%d'),
+                       'category': category,
+                       'description': description,
+                       'amount': amount,
+                       'currency': 'USD',
+                       'original description': description,
+                       'account name': account,
+                       'notes': ''}
+        return self.transaction_table.insert_one(transaction)
 
     @staticmethod
     def make_transaction_dict(td, account):
