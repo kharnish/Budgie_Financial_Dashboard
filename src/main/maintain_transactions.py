@@ -112,6 +112,12 @@ class MaintainTransactions:
         old_dict[change_dict['colId']] = change_dict['oldValue']
         return self.transaction_table.update_one(old_dict, {'$set': new_dict})
 
+    def delete_transaction(self, transaction_dict):
+        """Delete a list of transactions from the Transactions table"""
+        for trans in transaction_dict:
+            trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+        return self.transaction_table.delete_many(transaction_dict)
+
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
