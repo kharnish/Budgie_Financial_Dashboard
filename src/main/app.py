@@ -383,7 +383,7 @@ app.layout = html.Div(
                                                                       style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                       )]),
                                       html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category')]),
-                                      html.Div(id='modal-transaction-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'},),
+                                      html.Div(id='modal-transaction-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'}, ),
                                   ]),
                                   dbc.ModalFooter([
                                       html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="t-modal-cancel", className="ms-auto")]),
@@ -399,83 +399,83 @@ app.layout = html.Div(
                          dcc.Tab(label="Trends", value='Trends', children=[
                              html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
                                       children=[
-                             html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
-                                      children=[html.Button(style={'width': '75px', 'padding': '0'},
-                                                            children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
-                             html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
-                                      children=[html.Button(style={'width': '75px', 'padding': '0'},
-                                                            children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
-                             html.Div(id="trends-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
-                                      children=[dcc.Graph(id='trends-graph', style={'height': '600px'}, figure=fig)]),
-                             html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
+                                          html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
+                                                   children=[html.Button(style={'width': '75px', 'padding': '0'},
+                                                                         children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
+                                          html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
+                                                   children=[html.Button(style={'width': '75px', 'padding': '0'},
+                                                                         children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
+                                          html.Div(id="trends-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
+                                                   children=[dcc.Graph(id='trends-graph', style={'height': '600px'}, figure=fig)]),
+                                          html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-1')
+                                      ]),
                          ]),
-            ]),
-            dcc.Tab(label="Transactions", value='Transactions', children=[
-                html.Div(style={'width': '100%', 'float': 'left'}, className='tab-body',
-                         children=[
-                             html.Div(style={'padding': '10px', 'display': 'inline-block'},
-                                      children=[dbc.Button(children=["Edit ", html.I(className="fa-solid fa-pen-to-square")],
-                                                           style={'width': '80px'}, id="transact-edit", disabled=True, color="primary")]),
-                             html.Div(style={'padding': '10px', 'display': 'inline-block'},
-                                      children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
-                                                           style={'width': '100px'}, id="transact-delete", disabled=True, color="danger")]),
-                             html.I(className="fa-solid fa-circle-info", id='help-icon-2'),
-                             dbc.Tooltip("Press the space bar to undo/redo your selection",
-                                         target='help-icon-2',
-                                         placement='right',
-                                         style={'font-size': 14},
-                                         ),
+                         dcc.Tab(label="Transactions", value='Transactions', children=[
+                             html.Div(style={'width': '100%', 'float': 'left'}, className='tab-body',
+                                      children=[
+                                          html.Div(style={'padding': '10px', 'display': 'inline-block'},
+                                                   children=[dbc.Button(children=["Edit ", html.I(className="fa-solid fa-pen-to-square")],
+                                                                        style={'width': '80px'}, id="transact-edit", disabled=True, color="primary")]),
+                                          html.Div(style={'padding': '10px', 'display': 'inline-block'},
+                                                   children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
+                                                                        style={'width': '100px'}, id="transact-delete", disabled=True, color="danger")]),
+                                          html.I(className="fa-solid fa-circle-info", id='help-icon-2'),
+                                          dbc.Tooltip("Press the space bar to undo/redo your selection",
+                                                      target='help-icon-2',
+                                                      placement='right',
+                                                      style={'font-size': 14},
+                                                      ),
 
-                             dag.AgGrid(id="transactions-table",
-                                        style={"height": '600px'},
-                                        rowData=tab.get('data'),
-                                        columnDefs=tab.get('columns'),
-                                        columnSize="autoSize",
-                                        defaultColDef={'filter': True, "resizable": True, 'sortable': True,
-                                                       # "checkboxSelection": {"function": 'params.column == date'},
-                                                       # "headerCheckboxSelection": {"function": 'params.column == date'},
-                                                       # "headerCheckboxSelectionFilteredOnly": True,
-                                                       },
-                                        dashGridOptions={"rowSelection": "multiple"}  # , "suppressRowClickSelection": True},
-                                        ),
+                                          dag.AgGrid(id="transactions-table",
+                                                     style={"height": '600px'},
+                                                     rowData=tab.get('data'),
+                                                     columnDefs=tab.get('columns'),
+                                                     columnSize="autoSize",
+                                                     defaultColDef={'filter': True, "resizable": True, 'sortable': True,
+                                                                    # "checkboxSelection": {"function": 'params.column == date'},
+                                                                    # "headerCheckboxSelection": {"function": 'params.column == date'},
+                                                                    # "headerCheckboxSelectionFilteredOnly": True,
+                                                                    },
+                                                     dashGridOptions={"rowSelection": "multiple"}  # , "suppressRowClickSelection": True},
+                                                     ),
+                                      ]),
+                             html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-2')
                          ]),
-                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-2b')
-            ]),
-            dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
-                html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
-                         children=[
-                             dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
-                                       id='budget-graph', figure=fig),
-                             html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
-                                      children=[html.Button(id='new-budget-button', style={'width': 'auto'},
-                                                            children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
-                             dbc.Modal(id="budget-modal", is_open=False, children=[
-                                 dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
-                                 dbc.ModalBody(children=[
-                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
-                                              children=['Select budget category:',
-                                                        dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
-                                                                     style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
-                                                                     options=[''])]),
-                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
-                                              children=['Define budget amount:', html.Br(),
-                                                        dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                     html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
-                                              children=[dbc.Button(children=["Delete Budget ", html.I(className="fa-solid fa-trash-can")],
-                                                                   id="modal-delete", color="danger", style={'float': 'right'})]),
-                                     html.Div(id='modal-body-text', style={'display': 'inline-block', 'padding': '5px 0'}),
-                                 ]),
-                                 dbc.ModalFooter([
-                                     html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
-                                     dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
-                                                id="modal-submit", className="ms-auto", style={'float': 'left'})]
-                                 ),
-                             ]),
+                         dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
+                             html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
+                                      children=[
+                                          dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
+                                                    id='budget-graph', figure=fig),
+                                          html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
+                                                   children=[html.Button(id='new-budget-button', style={'width': 'auto'},
+                                                                         children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
+                                          dbc.Modal(id="budget-modal", is_open=False, children=[
+                                              dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                                              dbc.ModalBody(children=[
+                                                  html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                                           children=['Select budget category:',
+                                                                     dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                                                  style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
+                                                                                  options=[''])]),
+                                                  html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                                           children=['Define budget amount:', html.Br(),
+                                                                     dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                                                  html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
+                                                           children=[dbc.Button(children=["Delete Budget ", html.I(className="fa-solid fa-trash-can")],
+                                                                                id="modal-delete", color="danger", style={'float': 'right'})]),
+                                                  html.Div(id='modal-body-text', style={'display': 'inline-block', 'padding': '5px 0'}),
+                                              ]),
+                                              dbc.ModalFooter([
+                                                  html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                                                  dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
+                                                             id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                                              ),
+                                          ]),
+                                      ]),
+                             html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
                          ]),
-                html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
-            ]),
-        ]),
-                 ]
+                     ]),
+                 ]),
     ]
 )
 
@@ -689,7 +689,7 @@ def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_dat
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
-            mt.add_one_transaction(category, amount, t_date, description, account)
+            MT.add_one_transaction(category, amount, t_date, description, account)
             category = 'unknown'
             amount = '$ 0'
             t_date = date.today()
@@ -774,7 +774,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
 
 
 @app.callback(
-    Output('blank-space', 'children'),
+    Output('blank-space-1', 'children'),
     Input('transactions-table', 'cellValueChanged')
 )
 def update_table_data(change_data):

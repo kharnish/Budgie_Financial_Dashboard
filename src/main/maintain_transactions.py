@@ -128,7 +128,7 @@ class MaintainTransactions:
         """Delete a list of transactions from the Transactions table"""
         for trans in transaction_dict:
             trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
-        return self.transaction_table.delete_many(transaction_dict)
+            self.transaction_table.delete_one(trans)
 
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
