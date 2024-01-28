@@ -265,7 +265,6 @@ fig = make_trends_plot(current_config_dict)
 # Make initial table
 tab = make_table(current_config_dict)
 
-# Layout app window
 app.layout = html.Div(
     children=[
         dcc.Store(id='current-config-memory'),
@@ -345,12 +344,11 @@ app.layout = html.Div(
                          html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
                                          'vertical-align': 'middle'},
                                   children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
-                                                         options=get_accounts_list('new'))
-                                            ],
+                                                         clearable=True, options=get_accounts_list('new'))],
                                   ),
                          html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
                                   children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
-                                                      clearable=True, placeholder='New account name')], ),
+                                                      placeholder='New account name')], ),
                          html.Div(style={'display': 'inline-block'},
                                   children=[dcc.Upload(id='upload-data', multiple=True,
                                                        children=[html.Button('Select Transaction CSV')])]),
@@ -524,6 +522,7 @@ app.layout = html.Div(
             ]),
     ]
 )
+# Layout app window
 
 
 ########################################################################################
