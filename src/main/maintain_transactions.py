@@ -1,5 +1,6 @@
 import pandas as pd
 import pymongo
+from bson.objectid import ObjectId
 from dotenv import load_dotenv
 import os
 from datetime import datetime
@@ -40,24 +41,35 @@ class MaintainTransactions:
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
-        if 'transaction date' in df.columns:
+        if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
             df = df.rename(columns={'transaction date': 'date'})
         else:
-            df = df.rename(columns={'posted date': 'date'})
+            df = df.rename(columns={'posted date': 'date', 'booking date': 'date'})
         if 'original name' in df.columns:
             df = df.rename(columns={'payee': 'description', 'original name': 'original description'})
         else:
             df = df.rename(columns={'payee': 'description'})
         df['date'] = pd.to_datetime(df['date'])
-        if 'credit' in df.columns and 'debit' in df.columns:
+        if ('credit' in df.columns and 'debit' in df.columns):
             df['amount'] = df['credit'].fillna(-df['debit'])
-        if 'category' not in df.columns:
-            df['category'] = ''
+        elif 'credit debit indicator' in df.columns:
+            cdi = list(df['credit debit indicator'].str.lower())
+            vals = list(df['amount'])
+            new_vals = []
+            for i in range(len(cdi)):
+                if cdi[i] == 'credit':
+                    new_vals.append(vals[i])
+                else:
+                    new_vals.append(-vals[i])
+            df['amount'] = new_vals
         if 'original description' not in df.columns:
             df['original description'] = df['description']
         account_labels = True if 'account name' in df.columns else False
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
+        if 'category' not in df.columns or not account_labels:
+            df['category'] = ''
+
         df = df.fillna('')
 
         # Check to ensure all the necessary columns were converted
@@ -120,9 +132,26 @@ class MaintainTransactions:
         """Update transaction based on edits in Transaction table"""
         change_dict['data']['date'] = datetime.strptime(change_dict['data']['date'], '%m-%d-%Y')
         new_dict = change_dict['data']
+        new_dict.pop('_id')
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']
         return self.transaction_table.update_one(old_dict, {'$set': new_dict})
+
+    def edit_many_transactions(self, transaction_list):
+        for new_trans in transaction_list:
+            try:
+                new_trans['date'] = datetime.strptime(new_trans['date'], '%Y-%m-%d')
+            except ValueError:
+                new_trans['date'] = datetime.strptime(new_trans['date'], '%m-%d-%Y')
+            tid = new_trans.pop('_id')
+            self.transaction_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
+
+    def delete_transaction(self, transaction_dict):
+        """Delete a list of transactions from the Transactions table"""
+        for trans in transaction_dict:
+            trans.pop('_id')
+            trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+            self.transaction_table.delete_one(trans)
 
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
