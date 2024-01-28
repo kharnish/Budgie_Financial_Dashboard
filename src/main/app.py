@@ -302,7 +302,7 @@ app.layout = html.Div(
                             style={'display': 'inline-block', 'padding': '0px 20px 20px 21px', 'color': '#969696'}),
                  ]),
 
-        dcc.Tabs(id='selection_tabs', value='Trends', children=[
+        dcc.Tabs(id='selection_tabs', value='Rules', children=[
             dcc.Tab(label="Trends", value='Trends', children=[
                 html.Div(id="trends-plot", style={'width': '99%', 'height': '600px', 'float': 'left'},
                          children=[
@@ -333,31 +333,60 @@ app.layout = html.Div(
                                       children=[html.Button(id='new-budget-button', style={'backgroundColor': colors.get('navy'), 'width': 'auto'},
                                                             children=['Add Or Update Budget ', html.I(className="fa-solid fa-plus")])]),
                              dbc.Modal(id="budget-modal", is_open=False, children=[
-                                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
-                                     dbc.ModalBody(children=[
-                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
-                                                  children=['Select budget category:',
-                                                            dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
-                                                                         style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px', 'vertical-align': 'middle'},
-                                                                         options=[''])]),
-                                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
-                                                  children=['Define budget amount:', html.Br(),
-                                                            dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                         html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
-                                                  children=[dbc.Button(children=["Delete Budget ",
-                                                                                 html.I(className="fa-solid fa-trash-can", id='help-icon')],
-                                                                       id="modal-delete", color="danger", style={'float': 'right'})]),
-                                         html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
-                                     ]),
-                                     dbc.ModalFooter([
-                                         html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
-                                         dbc.Button(children=["Submit ",
-                                                              html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
-                                                    id="modal-submit", className="ms-auto", style={'float': 'left'})]
-                                       ),
+                                 dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                                 dbc.ModalBody(children=[
+                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                              children=['Select budget category:',
+                                                        dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                                     style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '400px', 'vertical-align': 'middle'},
+                                                                     options=[''])]),
+                                     html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                              children=['Define budget amount:', html.Br(),
+                                                        dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                                     html.Div(style={'display': 'inline-block', 'float': 'right', 'position': 'absolute', 'bottom': 15, 'right': 10},
+                                              children=[dbc.Button(children=["Delete Budget ",
+                                                                             html.I(className="fa-solid fa-trash-can", id='help-icon')],
+                                                                   id="modal-delete", color="danger", style={'float': 'right'})]),
+                                     html.Div(id='modal-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
                                  ]),
+                                 dbc.ModalFooter([
+                                     html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                                     dbc.Button(children=["Submit ",
+                                                          html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
+                                                id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                                 ),
+                             ]),
                          ]),
                 html.Div(style={'height': '10px'}, id='blank-space-3')
+            ]),
+            dcc.Tab(label="Rules", value='Rules', children=[
+                html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left', 'width': '95%'},
+                         children=[html.Button(id='new-rule-button', style={'backgroundColor': colors.get('navy'), 'width': 'auto'},
+                                               children=['Add New Rule ', html.I(className="fa-solid fa-plus")])]),
+                dbc.Modal(id="rule-modal", is_open=False, children=[
+                    dbc.ModalHeader(dbc.ModalTitle("Add New Rule")),
+                    dbc.ModalBody(children=[
+                        html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                 children=['If:', html.Br(),
+                                           dcc.Dropdown(id='rule-condition-dropdown', className='dropdown', clearable=True, placeholder='Select condition...',
+                                                        style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '150px', 'vertical-align': 'middle'},
+                                                        options=['Account', 'Amount', 'Date', 'Description']),
+                                           dcc.Dropdown(id='rule-equals-dropdown', className='dropdown',
+                                                        style={'display': 'inline-block', 'background-color': '#8A94AA', 'width': '200px', 'vertical-align': 'middle'},
+                                                        options=[])
+                                           ]),
+                        html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                 children=['Define budget amount:', html.Br(),
+                                           dcc.Input(id='rule-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                        html.Div(id='rule-body-text', style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'}),
+                    ]),
+                    dbc.ModalFooter([
+                        html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="rule-cancel", className="ms-auto")]),
+                        dbc.Button(children=["Submit ",
+                                             html.I(className="fa-solid fa-right-to-bracket", id='help-icon')],
+                                   id="rule-submit", className="ms-auto", style={'float': 'left'})]
+                    ),
+                ]),
             ]),
         ]),
     ]
@@ -470,6 +499,9 @@ def update_tab_data(current_params, which_tab):
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params)
+    elif which_tab == 'Rules':
+        tab_dict = make_table(zero_params_dict())
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict())
 
 
 @app.callback(
@@ -511,6 +543,38 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         return False, [], 'Select category...', '$ 0', '', delete
     else:
         return False, [], 'Select category...', '$ 0', '', delete
+
+
+@app.callback(
+    Output("rule-modal", "is_open"),
+    Output('rule-body-text', 'children'),
+    Output('rule-equals-dropdown', 'options'),
+    Input("new-rule-button", "n_clicks"),
+    Input("rule-cancel", "n_clicks"),
+    Input("rule-submit", "n_clicks"),
+    Input('rule-condition-dropdown', 'value'),
+    Input('rule-value-input', 'value'),
+)
+def toggle_budget_modal(open_modal, cancel, submit, rule_category, budget_value):
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger in ['new-rule-button.n_clicks']:
+        return True, '', []
+    elif trigger == 'rule-condition-dropdown.value':
+        if rule_category == 'Account' or rule_category == 'Description':
+            return True, '', ['Contains', 'Exactly', 'Starts With ', 'Ends With']
+        elif rule_category == 'Amount':
+            return True, '', ['Exactly', 'Greater than', 'Greater than or equal to', 'Less than', 'Less than or equal to', 'Between']
+
+    elif trigger == 'modal-submit.n_clicks':
+        cat_list = list(transactions_table.find().distinct('category'))
+        if rule_category != 'Select category...' and budget_value != '$ 0':
+            mt = MaintainTransactions()
+            mt.add_budget_item(rule_category, budget_value)
+            return False, '', []
+        else:
+            return True, 'You must specify category and budget amount for that category', []
+    else:
+        return False, '', []
 
 
 @app.callback(

@@ -3,6 +3,9 @@ import pymongo
 from dotenv import load_dotenv
 import os
 from datetime import datetime
+from difflib import SequenceMatcher, get_close_matches
+import numpy as np
+from datetime import timedelta
 
 
 class MaintainTransactions:
@@ -12,6 +15,8 @@ class MaintainTransactions:
         client = client_mongo[os.getenv("MONGO_DB")]
         self.transaction_table = client[os.getenv("TRANSACTIONS_CLIENT")]
         self.budget_table = client[os.getenv("BUDGET_CLIENT")]
+        self.rule_table = client[os.getenv("RULE_CLIENT")]
+        self.autocategories = None
 
     def add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added"""
@@ -42,6 +47,10 @@ class MaintainTransactions:
             return 'Error: Must provide account name if not given in CSV'
         df = df.fillna('')
 
+        # If only one account, get autocategorization categories from previous data
+        if account:
+            self._get_categories(account)
+
         # Check to ensure all the necessary columns were converted
         necessary_columns = ['date', 'description', 'amount']
         for col in necessary_columns:
@@ -56,7 +65,7 @@ class MaintainTransactions:
                 account = row['account name']
 
             duplicates = list(self.transaction_table.find({'amount': row['amount'], 'original description': row['original description'],
-                                               'account name': account}))
+                                                           'account name': account}))
             if len(duplicates) > 0:
                 for dup in duplicates:
                     if dup['date'] == row['date']:
@@ -64,20 +73,23 @@ class MaintainTransactions:
                         break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
-                        print(f"Found a duplicate item with a different date: {dup['original description']}")
-                        pass
+                        if abs((dup['date'] - row['date'])) < timedelta(days=10):
+                            print(f"Inserted a possible duplicate item: {row['date']} / {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                            transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                        break
             else:
                 # there's no match, so add the transaction
-                transaction_list.append(self.make_transaction_dict(row, account))
+                # but first, get the category
+                transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
         if len(transaction_list) > 0:
             self.transaction_table.insert_many(transaction_list)
         return len(transaction_list)
 
     @staticmethod
-    def make_transaction_dict(td, account):
+    def _make_transaction_dict(td, category, account):
         """Convert transaction dictionary into standard transaction dictionary"""
         default_transaction = {'date': td['date'],
-                               'category': td['category'] if td['category'] != '' else 'unknown',
+                               'category': category,
                                'description': td['description'],
                                'amount': td['amount'],
                                'currency': 'USD',
@@ -94,6 +106,28 @@ class MaintainTransactions:
         old_dict[change_dict['colId']] = change_dict['oldValue']
         return self.transaction_table.update_one(old_dict, {'$set': new_dict})
 
+    def _get_categories(self, account):
+        k = list(self.transaction_table.aggregate([
+            {'$match': {  # match with only this account
+                'account name': account}},
+            {'$group': {  # get the most recent, unique original description
+                '_id': '$original description',
+                'date': {'$last': '$date'},
+                'cat': {'$last': '$category'}}}
+        ]))
+        self.autocategories = {}
+        for cat in k:
+            self.autocategories[cat['_id']] = {'category': cat['cat'], 'date': cat['date']}
+
+    def _autocategorize(self, row):
+        try:
+            matches = get_close_matches(row['original description'], self.autocategories.keys(), cutoff=0.7)
+            matches_data = [self.autocategories[match] for match in matches]
+            i_most_recent = np.argmax([cat['date'] for cat in matches_data])
+            return matches_data[i_most_recent]['category']
+        except (ValueError, AttributeError):
+            return row['category'] if row['category'] != '' else 'unknown'
+
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
@@ -106,8 +140,27 @@ class MaintainTransactions:
         """Delete budget item in database"""
         self.budget_table.delete_one({'category': category, 'value': value})
 
+    def add_rule(self):
+        # If description contains DFAS and amount between 1500 and 2500: categorize as Income
+        rule = {'if': {'description': {'contains': 'dfas'}, 'amount': {'between': [1000, 2500]}},
+                'then': {'category': 'Income'}}
+        self.rule_table.insert_one(rule)
+
+        # If description contains District and amount between 500 and 900: categorize as Tithe
+        rule = {'if': {'description': {'contains': 'district'}, 'amount': {'between': [500, 900]}},
+                'then': {'category': 'Income'}}
+        self.rule_table.insert_one(rule)
+
 
 if __name__ == '__main__':
     mt = MaintainTransactions()
-    # mint_csv_path = ''
-    # print(mt.add_transactions(mint_csv_path))
+    lm_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\lunchmoney-20231220133052.csv'
+    # print(mt.add_transactions(lm_path))
+    mint_csv_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\mint_transactions_20231214.csv'
+
+    amex_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\transactions_amex_12-1_01-08.CSV'
+    # print(mt.add_transactions(amex_path, 'More Rewards Amex'))
+    checking_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\transactions_checking_12-1_01-08.CSV'
+    # print(mt.add_transactions(checking_path, 'Flagship Checking'))
+    boa_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\Transaction_BOA_12-01_01-08.csv'
+    print(mt.add_transactions(boa_path, 'Customized Cash Rewards World Mastercard Card'))
