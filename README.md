@@ -24,7 +24,9 @@ You can select multiple files to upload simultaneously for the same account.
 To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
 in the CSV file and simply leave the "New account name" input empty when uploading the file.
 
-Once the transactions are loaded, the parameters can be updated, either individually or multiple at one time.
+After the transactions are loaded, the parameters can be updated either individually or multiple at one time.
+
+The new transactions will attempt to be auto-categorized based on previous transactions with a similar description. 
 
 Once you categorize the transactions, you can add a budget and see your current status for different categories in the Budget tab.
 
