@@ -82,50 +82,54 @@ def make_trends_plot(conf_dict):
     Returns: Plotly figure object.
 
     """
+    def _sort_plot_data():
+        def _sort_funct(val):
+            return val['values']
+        if len(transactions) == 0:
+            # TODO Error, no transactions found for the given filters
+            lab_val = {'Spending': {'labels': [0], 'values': [0]},
+                       'Income': {'labels': [0], 'values': [0]}}
+        else:
+            lab_val = {'Spending': {'labels': [], 'values': []},
+                       'Income': {'labels': [], 'values': []}}
+            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
+                inc_amount = grp['amount'][grp['amount'] > 0].sum()
+                spd_amount = grp['amount'][grp['amount'] < 0].sum()
+                if spd_amount:
+                    lab_val['Spending']['labels'].append(cat)
+                    lab_val['Spending']['values'].append(-spd_amount)
+                if inc_amount:
+                    lab_val['Income']['labels'].append(cat)
+                    lab_val['Income']['values'].append(inc_amount)
+
+        for spin in ['Spending', 'Income']:
+            lab_val[spin]['values'], lab_val[spin]['labels'] = zip(*sorted(zip(lab_val[spin]['values'], lab_val[spin]['labels']), key=lambda x: x[0], reverse=True))
+        return lab_val
+
     transactions = get_mongo_transactions(conf_dict)
     transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
 
     if conf_dict['plot_type'] == 'bar':
         fig_obj = go.Figure()
-        if len(transactions) == 0:
-            # TODO Error, no transactions found for the given filters
-            fig_obj.add_trace(go.Bar(x=[0], y=[0]))
-        else:
-            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
-                amount = grp['amount'].sum()
-                if amount <= 0:
-                    label = 'Spending'
-                    amount = -amount
-                else:
-                    label = 'Income'
-                fig_obj.add_trace(go.Bar(y=[label], x=[amount], name=cat, orientation='h', meta=cat,
+        lab_val = _sort_plot_data()
+        for in_sp in ['Spending', 'Income']:
+            for i in range(len(lab_val[in_sp]['values'])):
+                fig_obj.add_trace(go.Bar(y=[in_sp], x=[lab_val[in_sp]['values'][i]], name=lab_val[in_sp]['labels'][i], orientation='h',
+                                         meta=lab_val[in_sp]['labels'][i],
                                          hovertemplate="%{meta}<br>$%{x:.2f}<extra></extra>"))
-            fig_obj.update_yaxes(title_text="Expenditures")
+        fig_obj.update_yaxes(title_text="Expenditures")
 
         fig_obj.update_xaxes(title_text="Amount ($)")
         fig_obj.update_layout(barmode='stack')
 
     elif conf_dict['plot_type'] == 'pie':
         fig_obj = make_subplots(rows=1, cols=2, subplot_titles=['Income', 'Spending'], specs=[[{'type': 'domain'}, {'type': 'domain'}]])
-        if len(transactions) == 0:
-            # TODO Error, no transactions found for the given filters
-            fig_obj.add_trace(go.Bar(x=[0], y=[0]))
-        else:
-            lab_val = {'Spending': {'labels': [], 'values': []},
-                       'Income': {'labels': [], 'values': []}}
-            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
-                amount = grp['amount'].sum()
-                if amount <= 0:
-                    lab_val['Spending']['labels'].append(cat)
-                    lab_val['Spending']['values'].append(-amount)
-                else:
-                    lab_val['Income']['labels'].append(cat)
-                    lab_val['Income']['values'].append(amount)
-            # TODO try and figure out a better hover label for the plots
-            fig_obj.add_trace(go.Pie(labels=lab_val['Income']['labels'], values=lab_val['Income']['values'], textinfo='percent+label',
-                                     meta=lab_val['Income']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 1)
-            fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'], textinfo='percent+label',
-                                     meta=lab_val['Spending']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 2)
+        lab_val = _sort_plot_data()
+        # TODO try and figure out a better hover label for the plots
+        fig_obj.add_trace(go.Pie(labels=lab_val['Income']['labels'], values=lab_val['Income']['values'], textinfo='percent+label',
+                                 meta=lab_val['Income']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 1)
+        fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'], textinfo='percent+label',
+                                 meta=lab_val['Spending']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 2)
 
     fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
                          zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
@@ -147,8 +151,6 @@ def make_trends_plot(conf_dict):
 def make_table(conf_dict):
     transactions = get_mongo_transactions(conf_dict)
     transactions['_id'] = [str(tid) for tid in transactions['_id']]
-    # transactions = transactions.rename(columns={'_id': 'id'})
-    # transactions = transactions.drop(columns=['_id'])
     transactions = transactions.sort_values('date', ascending=False)
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
