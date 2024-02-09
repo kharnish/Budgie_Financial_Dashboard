@@ -1,24 +1,25 @@
-import pandas as pd
-import pymongo
 from bson.objectid import ObjectId
-from dotenv import load_dotenv
-import os
 from datetime import datetime, timedelta
 from difflib import SequenceMatcher, get_close_matches
+from dotenv import load_dotenv
 import numpy as np
+import os
+import pandas as pd
+import pymongo
 
 
-class MaintainTransactions:
+class MaintainDatabase:
     def __init__(self):
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
         client = client_mongo[os.getenv("MONGO_DB")]
         self.transaction_table = client[os.getenv("TRANSACTIONS_CLIENT")]
         self.budget_table = client[os.getenv("BUDGET_CLIENT")]
+        self.accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
         self.autocategories = None
 
     def add_transactions(self, sheet, account=None):
-        """Add transactions to a database, ensuring duplicates are not added"""
+        """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
@@ -34,12 +35,12 @@ class MaintainTransactions:
                 df.columns = df.iloc[1]
                 df.drop([0, 1, 2], inplace=True)
                 df = df.reset_index(drop=True)
-
             df.drop(len(df) - 1, inplace=True)
             df = df.rename(columns={'Datetime': 'date', 'Note': 'description', 'Amount (total)': 'amount'})
-            df['amount'] = [val.split('$')[1] for val in df['amount']]
+            df['amount'] = [''.join(val.split(' $')) for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
             df['date'] = [val.split('T')[0] for val in df['date']]
+            df['notes'] = 'Source: ' + df['Funding Source'].replace({'Venmo balance': ''})
 
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
@@ -53,7 +54,7 @@ class MaintainTransactions:
         else:
             df = df.rename(columns={'payee': 'description'})
         df['date'] = pd.to_datetime(df['date'])
-        if ('credit' in df.columns and 'debit' in df.columns):
+        if 'credit' in df.columns and 'debit' in df.columns:
             df['amount'] = df['credit'].fillna(-df['debit'])
         elif 'credit debit indicator' in df.columns:
             cdi = list(df['credit debit indicator'].str.lower())
@@ -75,7 +76,7 @@ class MaintainTransactions:
 
         df = df.fillna('')
 
-        # If only one account, get autocategorization categories from previous data
+        # If only one account for that file, get autocategorization categories from previous data
         if account:
             self._get_categories(account)
 
@@ -92,28 +93,50 @@ class MaintainTransactions:
             if account_labels:
                 account = row['account name']
 
-            duplicates = list(self.transaction_table.find({'amount': row['amount'], 'original description': row['original description'],
-                                                           'account name': account}))
+            duplicates = list(self.transaction_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1}))
+
             if len(duplicates) > 0:
                 for dup in duplicates:
+                    if dup['date'] > row['date']:
+                        continue
                     if dup['date'] == row['date']:
-                        # It's an exact match for amount, description, and date, so definitely a duplicate
-                        break
+                        if dup['original description'] == row['original description']:
+                            # It's an exact match for amount, description, and date, so definitely a duplicate
+                            break
+                        else:
+                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.1)
+                            if matches:
+                                break
+                            else:
+                                print(f"Did not insert possible duplicate, but check different description: "
+                                      f"New: {row['date']}, {dup['original description']} / Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is overt 10 days from the duplicate, it's probably a recurring and not a duplicate
-                        if abs((dup['date'] - row['date'])) < timedelta(days=10):
-                            print(f"Inserted a possible duplicate item: {row['date']} / {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        if abs((dup['date'] - row['date'])) > timedelta(days=10):
+                            print(f"Inserted possible repeating transaction: New: {row['date']}, {dup['original description']} / "
+                                  f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
-                        break
+                            break
+                        else:
+                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.3)
+                            if matches:
+                                break
+                            else:
+                                print(f"Did not insert possible duplicate item: New: {row['date']}, {dup['original description']} / "
+                                      f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                break
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+
+        # Insert transactions into database
         if len(transaction_list) > 0:
             self.transaction_table.insert_many(transaction_list)
         return len(transaction_list)
 
-    def add_one_transaction(self, category, amount, t_date, description, account):
+    def add_one_transaction(self, category, amount, t_date, description, account, note):
         """Add a single manual transaction to the database"""
         transaction = {'date': datetime.strptime(t_date, '%Y-%m-%d'),
                        'category': category,
@@ -122,7 +145,7 @@ class MaintainTransactions:
                        'currency': 'USD',
                        'original description': description,
                        'account name': account,
-                       'notes': ''}
+                       'notes': note}
         return self.transaction_table.insert_one(transaction)
 
     @staticmethod
@@ -135,7 +158,7 @@ class MaintainTransactions:
                                'currency': 'USD',
                                'original description': td['original description'],
                                'account name': account,
-                               'notes': ''}
+                               'notes': td.get('notes')}
         return default_transaction
 
     def _get_categories(self, account):
@@ -191,24 +214,18 @@ class MaintainTransactions:
         """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
         if len(existing) == 1:
-            self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
+            return self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
         else:
-            self.budget_table.insert_one({'category': category, 'value': value})
+            return self.budget_table.insert_one({'category': category, 'value': value})
 
     def rm_budget_item(self, category, value):
         """Delete budget item in database"""
-        self.budget_table.delete_one({'category': category, 'value': value})
+        return self.budget_table.delete_one({'category': category, 'value': value})
+
+    def add_account(self, account_name, status='open', initial_balance=0):
+        """Add new account in database with current status and beginning balance for net worth"""
+        return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
 
 if __name__ == '__main__':
-    mt = MaintainTransactions()
-    lm_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\lunchmoney-20231220133052.csv'
-    # print(mt.add_transactions(lm_path))
-    mint_csv_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\mint_transactions_20231214.csv'
-
-    amex_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\transactions_amex_12-1_01-08.CSV'
-    # print(mt.add_transactions(amex_path, 'More Rewards Amex'))
-    checking_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\transactions_checking_12-1_01-08.CSV'
-    # print(mt.add_transactions(checking_path, 'Flagship Checking'))
-    boa_path = '\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\src\\budget_tracker\\Transaction_BOA_12-01_01-08.csv'
-    print(mt.add_transactions(boa_path, 'Customized Cash Rewards World Mastercard Card'))
+    md = MaintainDatabase()
