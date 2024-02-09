@@ -4,7 +4,7 @@ _A quick visualizer to monitor your personal finances._
 
 Process your bank transactions in a locally-hosted database to get an overview of your spending, categorize transactions, and define budget areas.
 
-![app screenshot](/src/main/assets/screenshot.PNG)
+![app screenshot](/src/assets/screenshot.PNG)
 
 ## Usage
 Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
