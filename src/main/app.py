@@ -1,39 +1,35 @@
-"""
-Author: Kelly Harnish, Code 8121
-Date:  02 May 2021
-"""
-import os
+import base64
 import dash
-import dash_bootstrap_components as dbc
 from dash import Dash, callback, dcc, html, Input, Output
+import dash_ag_grid as dag
+import dash_bootstrap_components as dbc
+from datetime import date, datetime, timedelta
+from dateutil.relativedelta import relativedelta
+from dotenv import load_dotenv
+from io import StringIO
+import os
+import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import pandas as pd
 import pymongo
-from datetime import date, datetime, timedelta
-from dotenv import load_dotenv
-import dash_ag_grid as dag
-import base64
-from io import StringIO
 
-from maintain_transactions import MaintainTransactions
+from maintain_transactions import MaintainDatabase
 
 load_dotenv()
 client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
 client = client_mongo[os.getenv("MONGO_DB")]
 transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
 budget_table = client[os.getenv("BUDGET_CLIENT")]
+accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
 
 external_stylesheets = ['assets/budgie_light.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
+MT = MaintainDatabase()
+
 EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
                                             'amount': [0], 'account name': [''], 'notes': ['']})
-
-MT = MaintainTransactions()
-
 EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
-# EXCLUDE_FROM_TABLE = ['original description', 'currency']
 EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
 
 
@@ -73,42 +69,61 @@ def get_mongo_transactions(conf_dict):
     return transactions
 
 
+def _update_layout_axes(fig_obj):
+    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
+    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
+                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
+                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
+    fig_obj.update_layout(
+        font=dict(family='Arial', size=15),
+        plot_bgcolor=colors['light'].get('background'),
+        paper_bgcolor=colors['light'].get('background'),
+        font_color=colors['light'].get('text'),
+        margin_l=30, margin_r=30, margin_t=20, margin_b=20,
+    )
+
+
 def make_trends_plot(conf_dict):
-    """Make plot object from waveform parameters.
+    """Make plot object from transactions broken into income and spending.
 
     Args:
-        conf_dict: Dictionary of the configuration parameters.
+        conf_dict: Dictionary of the configuration parameters
 
-    Returns: Plotly figure object.
+    Returns: Plotly figure object
 
     """
     def _sort_plot_data():
-        def _sort_funct(val):
-            return val['values']
-        if len(transactions) == 0:
+        if len(transactions) == 0 or transactions.iloc[0].description == 'No Available Data':
             # TODO Error, no transactions found for the given filters
-            lab_val = {'Spending': {'labels': [0], 'values': [0]},
-                       'Income': {'labels': [0], 'values': [0]}}
+            l_v = {'Spending': {'labels': [0], 'values': [0]},
+                   'Income': {'labels': [0], 'values': [0]}}
         else:
-            lab_val = {'Spending': {'labels': [], 'values': []},
-                       'Income': {'labels': [], 'values': []}}
+            l_v = {'Spending': {'labels': [], 'values': []},
+                   'Income': {'labels': [], 'values': []}}
             for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
                 inc_amount = grp['amount'][grp['amount'] > 0].sum()
                 spd_amount = grp['amount'][grp['amount'] < 0].sum()
                 if spd_amount:
-                    lab_val['Spending']['labels'].append(cat)
-                    lab_val['Spending']['values'].append(-spd_amount)
+                    l_v['Spending']['labels'].append(cat)
+                    l_v['Spending']['values'].append(-spd_amount)
                 if inc_amount:
-                    lab_val['Income']['labels'].append(cat)
-                    lab_val['Income']['values'].append(inc_amount)
+                    l_v['Income']['labels'].append(cat)
+                    l_v['Income']['values'].append(inc_amount)
 
         for spin in ['Spending', 'Income']:
-            lab_val[spin]['values'], lab_val[spin]['labels'] = zip(*sorted(zip(lab_val[spin]['values'], lab_val[spin]['labels']), key=lambda x: x[0], reverse=True))
-        return lab_val
+            if len(l_v[spin]['values']) > 0:
+                l_v[spin]['values'], l_v[spin]['labels'] = zip(*sorted(zip(l_v[spin]['values'], l_v[spin]['labels']), key=lambda x: x[0], reverse=True))
+            else:
+                l_v[spin]['values'], l_v[spin]['labels'] = [0], [0]
+        return l_v
 
+    # Get transactions
     transactions = get_mongo_transactions(conf_dict)
     transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
 
+    # Make bar plot
     if conf_dict['plot_type'] == 'bar':
         fig_obj = go.Figure()
         lab_val = _sort_plot_data()
@@ -122,6 +137,7 @@ def make_trends_plot(conf_dict):
         fig_obj.update_xaxes(title_text="Amount ($)")
         fig_obj.update_layout(barmode='stack')
 
+    # Or make pie plot
     elif conf_dict['plot_type'] == 'pie':
         fig_obj = make_subplots(rows=1, cols=2, subplot_titles=['Income', 'Spending'], specs=[[{'type': 'domain'}, {'type': 'domain'}]])
         lab_val = _sort_plot_data()
@@ -131,24 +147,19 @@ def make_trends_plot(conf_dict):
         fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'], textinfo='percent+label',
                                  meta=lab_val['Spending']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 2)
 
-    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
-                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
-    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
-                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
-    fig_obj.update_layout(
-        font=dict(family='Arial', size=15),
-        # showlegend=False,
-        plot_bgcolor=colors['light'].get('background'),
-        paper_bgcolor=colors['light'].get('background'),
-        font_color=colors['light'].get('text'),
-        margin_l=30, margin_r=30, margin_t=20, margin_b=20,
-    )
+    # Standard figure layout
+    _update_layout_axes(fig_obj)
     return fig_obj
 
 
 def make_table(conf_dict):
+    """Query the transactions and organize the data into a table, giving the correct parameters to each column
+
+    Args:
+        conf_dict: Dictionary of the configuration parameters.
+
+    Returns: Data and Columns dictionary
+    """
     transactions = get_mongo_transactions(conf_dict)
     transactions['_id'] = [str(tid) for tid in transactions['_id']]
     transactions = transactions.sort_values('date', ascending=False)
@@ -165,6 +176,7 @@ def make_table(conf_dict):
             col['type'] = 'numericColumn'
             col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
             col['filter'] = 'agNumberColumnFilter'
+            col['editable'] = True
         elif col['field'] == 'category':
             col['width'] = 150
             col['editable'] = True
@@ -180,30 +192,20 @@ def make_table(conf_dict):
             col['headerCheckboxSelection'] = True
             col['headerCheckboxSelectionFilteredOnly'] = True
             col['filter'] = 'agDateColumnFilter'
+        elif col['field'] == 'notes':
+            col['editable'] = True
     return {'data': data, 'columns': columns}
 
 
-def get_accounts_list(extra=''):
-    acc_list = []
-    if extra == 'new':
-        acc_list = list(transactions_table.find().distinct('account name'))
-        acc_list.extend(['Add new account...'])
-    else:
-        acc_list.extend(transactions_table.find().distinct('account name'))
-    return acc_list
-
-
-def get_categories_list(extra=''):
-    cat_list = []
-    if extra == 'new':
-        cat_list = list(transactions_table.find().distinct('category'))
-        cat_list.extend(['Add new category...'])
-    else:
-        cat_list.extend(transactions_table.find().distinct('category'))
-    return cat_list
-
-
 def make_budget_plot(conf_dict):
+    """Make bar plot of budget, showing spending and spending limit for each category.
+
+    Args:
+        conf_dict: Dictionary of the configuration parameters.
+
+    Returns: Plotly figure object
+
+    """
     budget_dict = {}
     for item in budget_table.find():
         budget_dict[item['category']] = item['value']
@@ -224,22 +226,133 @@ def make_budget_plot(conf_dict):
     fig_obj.add_vline(x=100, line_width=3, line_color=colors['light'].get('gridgray'))
     # TODO make a vertical line on each bar to show how far along you are in the month
 
-    fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
-                         showgrid=True, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
-    fig_obj.update_yaxes(showline=True, mirror=True, linewidth=1, linecolor=colors['light'].get('gridgray'),
-                         zeroline=True, zerolinewidth=1, zerolinecolor=colors['light'].get('gridgray'),
-                         showgrid=False, gridwidth=1, gridcolor=colors['light'].get('gridgray'))
-    fig_obj.update_layout(
-        font=dict(family='Arial', size=15),
-        showlegend=False,
-        plot_bgcolor=colors['light'].get('background'),
-        paper_bgcolor=colors['light'].get('background'),
-        font_color=colors['light'].get('text'),
-        margin_l=30, margin_r=30, margin_t=20, margin_b=20,
-    )
+    # Standard figure layout, but don't show horizonal lines
+    _update_layout_axes(fig_obj)
+    fig_obj.update_yaxes(showgrid=False)
+    fig_obj.update_layout(showlegend=False)
 
     return fig_obj
+
+
+def make_net_worth_plot(conf_dict):
+    """Make a plot of the net worth of each account over time for the past 6 months
+    # TODO make the time window shown based on the
+
+    Args:
+        conf_dict: Dictionary of the configuration parameters.
+
+    Returns: Plotly figure object
+
+    """
+    # Ensure it queries all transactions since the beginning
+    all_time_config = zero_params_dict()
+    all_time_config['start_date'] = '2000-01-01'
+    transactions = get_mongo_transactions(all_time_config)
+    transactions = transactions.drop(transactions[(transactions['account name'] == 'Venmo') & (transactions.notes.str.contains('Source'))].index)
+
+    # Get metadata for each account
+    accounts = pd.DataFrame(accounts_table.find())
+
+    # Make figure
+    fig_obj = go.Figure()
+
+    # Get net worth every week for past 6 months
+    days = [date.today()]
+    for i in range(1, 26):
+        days.append(date(days[-1].year, days[-1].month, days[-1].day) - timedelta(days=7))
+
+    net_worth = []
+    val_dict = {}
+    for end_day in days:
+        this_month = transactions[transactions['date'].dt.date < end_day]
+        net_worth.append(this_month['amount'].sum())
+        for acc in get_accounts_list():
+            acc_status = accounts[accounts['account name'] == acc]
+            grp = this_month[this_month['account name'] == acc]
+            current_val = grp['amount'].sum() + float(acc_status['initial balance'].iloc[0])
+            if abs(current_val) < 0.001:
+                current_val = 0
+            try:
+                val_dict[acc].append(current_val)
+            except KeyError:
+                val_dict[acc] = [current_val]
+
+    # Convert account net worth data to dataframe to drop accounts that are closed and sort
+    val_df = pd.DataFrame(val_dict)
+    val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
+    recent_worth = val_df.iloc[0]
+    recent_worth = recent_worth.sort_values(ascending=False)
+
+    # Plot the account and overall net worth data
+    for acc in recent_worth.index:
+        if recent_worth[acc] < 0:
+            stackgroup = 'one'
+        else:
+            stackgroup = 'two'
+        fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup))
+
+    fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
+                                 marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3}))
+
+    # Standard figure layout
+    _update_layout_axes(fig_obj)
+    return fig_obj
+
+
+def make_accounts_table(conf_dict):
+    """Query account metadata and organize into data and columns
+
+    Args:
+        conf_dict: Dictionary of the configuration parameters.
+
+    Returns: Data and Columns dictionary
+
+    """
+    # Query and organize account data
+    accounts = pd.DataFrame(accounts_table.find())
+    accounts = accounts.drop(columns=['_id'])
+    accounts = accounts.sort_values('account name')
+    data = accounts.to_dict('records')
+    columns = [{"field": i} for i in accounts.columns]
+
+    # Update the column format for each column
+    for col in columns:
+        if col['field'] == 'initial balance':
+            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['type'] = 'numericColumn'
+            col['filter'] = 'agNumberColumnFilter'
+        elif col['field'] == 'status':
+            col['cellStyle'] = {"function": "params.value == 'closed' ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
+
+    return {'data': data, 'columns': columns}
+
+
+def get_accounts_list(extra=''):
+    """Get list of all accounts with an associated transaction
+
+    Parameter to add an additional "Add new account..." option
+    """
+    acc_list = []
+    if extra == 'new':
+        acc_list = list(transactions_table.find().distinct('account name'))
+        acc_list.extend(['Add new account...'])
+    else:
+        acc_list.extend(transactions_table.find().distinct('account name'))
+    return acc_list
+
+
+def get_categories_list(extra=''):
+    """Get list of all categories with an associated transaction
+
+    Parameter to add an additional "Add new category..." option
+    """
+    cat_list = []
+    if extra == 'new':
+        cat_list = list(transactions_table.find().distinct('category'))
+        cat_list.extend(['Add new category...'])
+    else:
+        cat_list.extend(transactions_table.find().distinct('category'))
+    return cat_list
 
 
 colors = {
@@ -267,6 +380,10 @@ fig = make_trends_plot(current_config_dict)
 # Make initial table
 tab = make_table(current_config_dict)
 
+# Account table
+acc_tab = make_accounts_table(current_config_dict)
+
+# Layout app window
 app.layout = html.Div(
     children=[
         dcc.Store(id='current-config-memory'),
@@ -311,7 +428,7 @@ app.layout = html.Div(
                                               'vertical-align': 'middle'},
                                        children=[dcc.Dropdown(id='time-dropdown', value=current_config_dict['time_filter'], maxHeight=400,
                                                               clearable=False, searchable=False, className='dropdown',
-                                                              options=['This Month', 'Last Month', 'This Year', 'Last Year',
+                                                              options=['This Month', 'Last Month', 'Last 3 Months', 'This Year', 'Last Year',
                                                                        'All Time', 'Custom'],
                                                               )
                                                  ],
@@ -370,23 +487,27 @@ app.layout = html.Div(
                                                         initial_visible_month=date.today(),
                                                     )]),
                                  html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
-                                          children=['Select Account:',
+                                          children=['Select Account*',
                                                     dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Select account...',
                                                                  style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                  options=get_accounts_list())]),
                                  html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
-                                          children=['Transaction Amount:', html.Br(),
+                                          children=['Transaction Amount*', html.Br(),
                                                     dcc.Input(id='transaction-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                 html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
-                                          children=['Description:', html.Br(),
-                                                    dcc.Input(id='description-input', type='text', style={'display': 'inline-block'},
+                                 html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
+                                          children=['Description*', html.Br(),
+                                                    dcc.Input(id='description-input', type='text', style={'display': 'inline-block', 'width': '100%'},
                                                               placeholder='Transaction description')]),
                                  html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
-                                          children=['Select Category:',
+                                          children=['Select Category',
                                                     dcc.Dropdown(id='modal-category-dropdown', className='dropdown', clearable=True, placeholder='unknown',
                                                                  style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                  )]),
                                  html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category')]),
+                                 html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
+                                          children=['Note', html.Br(),
+                                                    dcc.Input(id='note-input', type='text', style={'display': 'inline-block', 'width': '100%'},
+                                                              placeholder='Transaction note')]),
                                  html.Div(id='modal-transaction-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'}, ),
                              ]),
                              dbc.ModalFooter([
@@ -453,6 +574,10 @@ app.layout = html.Div(
                                                                              style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                              )]),
                                              html.Div([dcc.Input(id='new-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category')]),
+                                             html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
+                                                      children=['New Note:', html.Br(),
+                                                                dcc.Input(id='new-note-input', type='text', style={'display': 'inline-block', 'width': '400px'},
+                                                                          placeholder='New Note')]),
                                              html.Div(id='new-modal-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'}, ),
                                          ]),
                                          dbc.ModalFooter([
@@ -471,18 +596,13 @@ app.layout = html.Div(
                                                  placement='right',
                                                  style={'font-size': 14},
                                                  ),
-
                                      dag.AgGrid(id="transactions-table",
                                                 style={"height": '600px'},
                                                 rowData=tab.get('data'),
                                                 columnDefs=tab.get('columns'),
                                                 columnSize="autoSize",
-                                                defaultColDef={'filter': True, "resizable": True, 'sortable': True,
-                                                               # "checkboxSelection": {"function": 'params.column == date'},
-                                                               # "headerCheckboxSelection": {"function": 'params.column == date'},
-                                                               # "headerCheckboxSelectionFilteredOnly": True,
-                                                               },
-                                                dashGridOptions={"rowSelection": "multiple"}  # , "suppressRowClickSelection": True},
+                                                defaultColDef={'filter': True, "resizable": True, 'sortable': True},
+                                                dashGridOptions={"rowSelection": "multiple"}
                                                 ),
                                  ]),
                         html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-2')
@@ -520,11 +640,29 @@ app.layout = html.Div(
                                  ]),
                         html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
                     ]),
+                    dcc.Tab(label="Net Worth", value='Net Worth', children=[
+                        html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
+                                 children=[
+                                     html.Div(id="net-worth-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
+                                              children=[dcc.Graph(id='net-worth-graph', style={'height': '600px'}, figure=fig)])
+                                 ]),
+                    ]),
+                    dcc.Tab(label="Accounts", value='Accounts', children=[
+                        html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
+                                 children=[dag.AgGrid(id="accounts-table",
+                                                      dashGridOptions={"domLayout": "autoHeight"},
+                                                      # style={"height": '600px'},
+                                                      rowData=acc_tab['data'],
+                                                      columnDefs=acc_tab['columns'],
+                                                      columnSize="autoSize",
+                                                      defaultColDef={'filter': True, "resizable": True, 'sortable': True},
+                                                      )
+                                           ],
+                                 )]),
                 ]),
             ]),
     ]
 )
-# Layout app window
 
 
 ########################################################################################
@@ -577,23 +715,24 @@ def update_plot_parameters(field_filter, time_filter, filter_values, curr_params
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
         if time_filter == 'This Month':
-            today = date.today()
-            new_params['start_date'] = date(today.year, today.month, 1)
             new_params['end_date'] = date.today()
+            new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1)
             date_range_style = {'display': 'none'}
         elif time_filter == 'Last Month':
             today = date.today()
             new_params['end_date'] = date(today.year, today.month, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1)
             date_range_style = {'display': 'none'}
+        elif time_filter == 'Last 3 Months':
+            new_params['end_date'] = date.today()
+            new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1) - relativedelta(months=3)
+            date_range_style = {'display': 'none'}
         elif time_filter == 'This Year':
-            today = date.today()
-            new_params['end_date'] = today
-            new_params['start_date'] = date(today.year, 1, 1)
+            new_params['end_date'] = date.today()
+            new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
             date_range_style = {'display': 'none'}
         elif time_filter == 'Last Year':
-            today = date.today()
-            new_params['end_date'] = date(today.year, 1, 1) - timedelta(days=1)
+            new_params['end_date'] = date(date.today().year, 1, 1) - timedelta(days=1)
             new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
             date_range_style = {'display': 'none'}
         elif time_filter == 'All Time':
@@ -627,6 +766,9 @@ def update_plot_parameters(field_filter, time_filter, filter_values, curr_params
     Output('transactions-table', 'rowData'),
     Output('transactions-table', 'columnDefs'),
     Output('budget-graph', 'figure'),
+    Output('net-worth-graph', 'figure'),
+    Output('accounts-table', 'rowData'),
+    Output('accounts-table', 'columnDefs'),
     Input('current-config-memory', 'data'),
     Input('selection_tabs', 'value')
 )
@@ -644,13 +786,29 @@ def update_tab_data(current_params, which_tab):
     """
     if which_tab == 'Trends':
         tab_dict = make_table(zero_params_dict())
-        return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict())
+        acc_dict = make_accounts_table(zero_params_dict())
+        return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+            acc_dict['data'], acc_dict['columns']
     elif which_tab == 'Transactions':
         tab_dict = make_table(current_params)
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict())
+        acc_dict = make_accounts_table(zero_params_dict())
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+            acc_dict['data'], acc_dict['columns']
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params)
+        acc_dict = make_accounts_table(zero_params_dict())
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params), make_net_worth_plot(zero_params_dict()), \
+            acc_dict['data'], acc_dict['columns']
+    elif which_tab == 'Net Worth':
+        tab_dict = make_table(zero_params_dict())
+        acc_dict = make_accounts_table(zero_params_dict())
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(current_params), \
+            acc_dict['data'], acc_dict['columns']
+    elif which_tab == 'Accounts':
+        tab_dict = make_table(zero_params_dict())
+        acc_dict = make_accounts_table(current_params)
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+            acc_dict['data'], acc_dict['columns']
 
 
 @app.callback(
@@ -704,6 +862,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     Output('modal-transaction-text', 'children'),
     Output('modal-category-input', 'style'),
     Output('modal-category-dropdown', 'options'),
+    Output('note-input', 'value'),
 
     Input("manual-button", "n_clicks"),
     Input("t-modal-cancel", "n_clicks"),
@@ -713,9 +872,10 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     Input('transaction-date', 'date'),
     Input('description-input', 'value'),
     Input('modal-account-dropdown', 'value'),
-    Input('modal-category-input', 'value')
+    Input('modal-category-input', 'value'),
+    Input('note-input', 'value'),
 )
-def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_category):
+def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_category, note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     is_open = False
@@ -735,17 +895,18 @@ def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_dat
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
-            MT.add_one_transaction(category, amount, t_date, description, account)
+            MT.add_one_transaction(category, amount, t_date, description, account, note)
             category = 'unknown'
             amount = '$ 0'
             t_date = date.today()
             description = None
             account = None
+            note = None
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify all values.", color="danger")
     elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'description-input.value',
-                     'modal-account-dropdown.value', 'modal-category-input.value']:
+                     'modal-account-dropdown.value', 'modal-category-input.value', 'note-input.value']:
         is_open = True
     else:
         category = 'unknown'
@@ -753,8 +914,9 @@ def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_dat
         t_date = date.today()
         description = None
         account = None
+        note = None
 
-    return is_open, category, amount, t_date, description, account, msg_str, cat_input, get_categories_list('new')
+    return is_open, category, amount, t_date, description, account, msg_str, cat_input, get_categories_list('new'), note
 
 
 @app.callback(
@@ -771,9 +933,10 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
 
     Args:
         account: Account name for transactions
-        loaded_file: contents of uploaded transactions file
+        loaded_file: Contents of uploaded transactions file
+        new_account: New account name text input
 
-    Returns: String if the file is able to be written or not.
+    Returns: String with message about if the transactions were uploaded
 
     """
     upload_button = {'display': 'none'}
@@ -802,6 +965,8 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 continue
 
             results = MT.add_transactions(m, account)
+            if new_account:
+                MT.add_account(new_account)
             if isinstance(results, int):
                 if results == 0:
                     msg.append(f"File {i + 1}: No new transactions to upload")
@@ -844,6 +1009,7 @@ def update_table_data(change_data):
     Output('new-account-input', 'style'),
     Output('new-account-input', 'value'),
     Output('new-modal-text', 'children'),
+    Output('new-note-input', 'value'),
 
     Input('transact-edit', 'n_clicks'),
     Input('transact-delete', 'n_clicks'),
@@ -857,8 +1023,9 @@ def update_table_data(change_data):
     Input('new-description-input', 'value'),
     Input('new-account-dropdown', 'value'),
     Input('new-account-input', 'value'),
+    Input('new-note-input', 'value'),
 )
-def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, category, new_category, amount, t_date, description, account, new_account):
+def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, category, new_category, amount, t_date, description, account, new_account, new_note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     is_open = False
@@ -908,12 +1075,16 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                     update_dict['category'] = new_category
             else:
                 update_dict['category'] = category
+        if new_note is not None:
+            update_dict['notes'] = new_note
 
         if len(update_dict) != 0:
             for r in row_data:
                 for key, val in update_dict.items():
                     r[key] = val
             MT.edit_many_transactions(row_data)
+            if new_account:
+                MT.add_account(new_account)
             category = None
             new_category = None
             amount = None
@@ -921,12 +1092,13 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
             description = None
             account = None
             new_account = None
+            new_note = None
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify at least one value to update.", color="danger") if msg_str == '' else msg_str
 
     elif trigger in ['new-category-dropdown.value', 'new-transaction-value.value', 'new-transaction-date.date', 'new-description-input.value',
-                     'new-account-dropdown.value', 'new-account-input.value', 'new-category-input.value']:
+                     'new-account-dropdown.value', 'new-account-input.value', 'new-category-input.value', 'new-note-input.value']:
         is_open = True
     else:
         category = None
@@ -936,8 +1108,9 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         description = None
         account = None
         new_account = None
+        new_note = None
 
-    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, account_style,  new_account, msg_str
+    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, account_style, new_account, msg_str, new_note
 
 
 if __name__ == '__main__':

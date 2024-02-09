@@ -30,6 +30,10 @@ The new transactions will attempt to be auto-categorized based on previous trans
 
 Once you categorize the transactions, you can add a budget and see your current status for different categories in the Budget tab.
 
+### Special note about Venmo
+Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 
+transaction notes as "Source: [source information]" in order to properly calculate your net worth. 
+
 ## Security
 All transaction data is stored locally in your MongoDB. 
 
