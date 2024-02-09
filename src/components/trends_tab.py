@@ -1,4 +1,4 @@
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import dcc, html
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 

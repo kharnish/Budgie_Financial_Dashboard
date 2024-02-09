@@ -1,4 +1,4 @@
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import dcc, html
 from datetime import date, timedelta
 import pandas as pd
 import plotly.graph_objects as go

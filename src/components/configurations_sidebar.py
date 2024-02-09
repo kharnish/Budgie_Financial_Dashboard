@@ -1,6 +1,6 @@
 import base64
 import dash
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import callback, dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
