@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import Dash, callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 
 from configurations_sidebar import configurations_sidebar
@@ -21,6 +21,7 @@ current_config_dict = zero_params_dict()
 app.layout = html.Div(
     children=[
         dcc.Store(id='current-config-memory'),
+        dcc.Store(id='update-tab'),
 
         html.Div(style={'background-color': '#2C4864'},
                  children=[
@@ -35,7 +36,7 @@ app.layout = html.Div(
         html.Div(
             id='tab-div', style={'padding': '20px'},  # tabs container
             children=[
-                dcc.Tabs(id='selection_tabs', value='Trends', children=[
+                dcc.Tabs(id='selection-tabs', value='Trends', children=[
                     trends_tab,
                     transaction_tab,
                     budget_tab,
@@ -56,10 +57,12 @@ app.layout = html.Div(
     Output('net-worth-graph', 'figure'),
     Output('accounts-table', 'rowData'),
     Output('accounts-table', 'columnDefs'),
+
     Input('current-config-memory', 'data'),
-    Input('selection_tabs', 'value')
+    Input('selection-tabs', 'value'),
+    Input('update-tab', 'data')
 )
-def update_tab_data(current_params, which_tab):
+def update_tab_data(current_params, which_tab, update_tab):
     """Updates the waveform graph given the parameters of the waveform and creates plot.
 
     Args:
