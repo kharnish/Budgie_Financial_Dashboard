@@ -16,7 +16,6 @@ def make_trends_plot(conf_dict):
     """
     def _sort_plot_data():
         if len(transactions) == 0 or transactions.iloc[0].description == 'No Available Data':
-            # TODO Error, no transactions found for the given filters
             l_v = {'Spending': {'labels': [0], 'values': [0]},
                    'Income': {'labels': [0], 'values': [0]}}
         else:

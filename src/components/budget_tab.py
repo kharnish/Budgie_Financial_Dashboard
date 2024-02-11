@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import Dash, callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
@@ -85,35 +85,51 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
     Output('budget-value-input', 'value'),
     Output('modal-body-text', 'children'),
     Output('modal-delete', 'style'),
+    Output('update-tab', 'data', allow_duplicate=True),
 
     Input("new-budget-button", "n_clicks"),
     Input("modal-cancel", "n_clicks"),
     Input("modal-submit", "n_clicks"),
     Input('budget-category-dropdown', 'value'),
     Input('budget-value-input', 'value'),
-    Input('modal-delete', 'n_clicks')
+    Input('modal-delete', 'n_clicks'),
+    prevent_initial_call=True,
 )
 def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_value, delete_button):
     trigger = dash.callback_context.triggered[0]['prop_id']
+
+    is_open = False
+    categories = []
+    msg_str = ''
+    update_tab = no_update
     delete = {'display': 'none'}
+
     if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value', 'budget-value-input.value']:
-        if budget_category != 'Select category...':
+        if budget_category is not None:
             bv = list(budget_table.find({'category': budget_category}))
             if len(bv) > 0:
                 budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
                 delete = {'float': 'right'}
             elif trigger == 'budget-category-dropdown.value':
                 budget_value = '$ 0'
-        return True, get_categories_list(), budget_category, budget_value, '', delete
+        is_open = True
+        categories = get_categories_list()
     elif trigger == 'modal-submit.n_clicks':
-        cat_list = list(transactions_table.find().distinct('category'))
+        categories = list(transactions_table.find().distinct('category'))
         if budget_category != 'Select category...' and budget_value != '$ 0':
             MT.add_budget_item(budget_category, budget_value)
-            return False, [], 'Select category...', '$ 0', '', delete
+            update_tab = True
+            budget_category = None
+            budget_value = None
         else:
-            return True, cat_list, budget_category, budget_value, 'You must specify category and budget amount for that category', delete
+            is_open = True
+            msg_str = 'You must specify category and budget amount for that category'
     elif trigger == 'modal-delete.n_clicks':
         MT.rm_budget_item(budget_category, budget_value)
-        return False, [], 'Select category...', '$ 0', '', delete
+        update_tab = True
+        budget_category = None
+        budget_value = None
     else:
-        return False, [], 'Select category...', '$ 0', '', delete
+        print('stop')
+
+    return is_open, categories, budget_category, budget_value, msg_str, delete, update_tab

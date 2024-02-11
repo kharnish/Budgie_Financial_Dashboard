@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import Dash, callback, dcc, html, Input, Output, no_update
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date
@@ -128,73 +128,6 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
 
 
 @callback(
-    Output("transaction-modal", "is_open"),
-    Output('modal-category-dropdown', 'value'),
-    Output('transaction-value-input', 'value'),
-    Output('transaction-date', 'date'),
-    Output('description-input', 'value'),
-    Output('modal-account-dropdown', 'value'),
-    Output('modal-transaction-text', 'children'),
-    Output('modal-category-input', 'style'),
-    Output('modal-category-dropdown', 'options'),
-    Output('note-input', 'value'),
-
-    Input("manual-button", "n_clicks"),
-    Input("t-modal-cancel", "n_clicks"),
-    Input("t-modal-submit", "n_clicks"),
-    Input('modal-category-dropdown', 'value'),
-    Input('transaction-value-input', 'value'),
-    Input('transaction-date', 'date'),
-    Input('description-input', 'value'),
-    Input('modal-account-dropdown', 'value'),
-    Input('modal-category-input', 'value'),
-    Input('note-input', 'value'),
-)
-def toggle_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_category, note):
-    trigger = dash.callback_context.triggered[0]['prop_id']
-
-    is_open = False
-    msg_str = ''
-    if category == 'Add new category...':
-        cat_input = {'display': 'inline-block'}
-    else:
-        cat_input = {'display': 'none'}
-
-    if trigger == 'manual-button.n_clicks':
-        is_open = True
-    elif trigger == 't-modal-submit.n_clicks':
-        if amount != '$ 0' and description is not None and account is not None:
-            if category == 'Add new category...':
-                if new_category == '':
-                    is_open = True
-                    msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
-                else:
-                    category = new_category
-            MT.add_one_transaction(category, amount, t_date, description, account, note)
-            category = 'unknown'
-            amount = '$ 0'
-            t_date = date.today()
-            description = None
-            account = None
-            note = None
-        else:
-            is_open = True
-            msg_str = dbc.Alert("You must specify all values.", color="danger")
-    elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'description-input.value',
-                     'modal-account-dropdown.value', 'modal-category-input.value', 'note-input.value']:
-        is_open = True
-    else:
-        category = 'unknown'
-        amount = '$ 0'
-        t_date = date.today()
-        description = None
-        account = None
-        note = None
-
-    return is_open, category, amount, t_date, description, account, msg_str, cat_input, get_categories_list('new'), note
-
-
-@callback(
     Output('blank-space-1', 'children'),
     Input('transactions-table', 'cellValueChanged')
 )
@@ -220,6 +153,7 @@ def update_table_data(change_data):
     Output('new-account-input', 'value'),
     Output('new-modal-text', 'children'),
     Output('new-note-input', 'value'),
+    Output('update-tab', 'data', allow_duplicate=True),
 
     Input('transact-edit', 'n_clicks'),
     Input('transact-delete', 'n_clicks'),
@@ -234,6 +168,7 @@ def update_table_data(change_data):
     Input('new-account-dropdown', 'value'),
     Input('new-account-input', 'value'),
     Input('new-note-input', 'value'),
+    prevent_initial_call=True,
 )
 def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, category, new_category, amount, t_date, description, account, new_account, new_note):
     trigger = dash.callback_context.triggered[0]['prop_id']
@@ -241,6 +176,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
     is_open = False
     msg_str = ''
     enabled = True
+    update_tab = no_update
 
     if category == 'Add new category...':
         cat_style = {'display': 'inline-block', 'width': '400px'}
@@ -256,6 +192,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
 
     elif trigger == 'transact-delete.n_clicks':
         MT.delete_transaction(row_data)
+        update_tab = True
 
     elif trigger == 'transact-edit.n_clicks':
         is_open = True
@@ -293,6 +230,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                 for key, val in update_dict.items():
                     r[key] = val
             MT.edit_many_transactions(row_data)
+            # TODO Update Table
             if new_account:
                 MT.add_account(new_account)
             category = None
@@ -303,6 +241,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
             account = None
             new_account = None
             new_note = None
+            update_tab = True
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify at least one value to update.", color="danger") if msg_str == '' else msg_str
@@ -320,4 +259,5 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         new_account = None
         new_note = None
 
-    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, account_style, new_account, msg_str, new_note
+    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, \
+        account_style, new_account, msg_str, new_note, update_tab
