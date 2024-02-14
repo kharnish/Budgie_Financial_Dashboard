@@ -4,17 +4,10 @@ import os
 import pandas as pd
 import pymongo
 
-from maintain_transactions import MaintainDatabase
+from maintain_database import MaintainDatabase
 
 
-load_dotenv()
-client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
-client = client_mongo[os.getenv("MONGO_DB")]
-transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
-budget_table = client[os.getenv("BUDGET_CLIENT")]
-accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
-
-MT = MaintainDatabase()
+MD = MaintainDatabase()
 
 EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
                                             'amount': [0], 'account name': [''], 'notes': ['']})
@@ -61,7 +54,7 @@ def get_mongo_transactions(conf_dict):
     else:
         mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
 
-    transactions = pd.DataFrame(transactions_table.find({
+    transactions = pd.DataFrame(MD.transactions_table.find({
         'date': {
             '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
             '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
@@ -95,10 +88,10 @@ def get_accounts_list(extra=''):
     """
     acc_list = []
     if extra == 'new':
-        acc_list = list(transactions_table.find().distinct('account name'))
+        acc_list = list(MD.transactions_table.find().distinct('account name'))
         acc_list.extend(['Add new account...'])
     else:
-        acc_list.extend(transactions_table.find().distinct('account name'))
+        acc_list.extend(MD.transactions_table.find().distinct('account name'))
     return acc_list
 
 
@@ -109,8 +102,8 @@ def get_categories_list(extra=''):
     """
     cat_list = []
     if extra == 'new':
-        cat_list = list(transactions_table.find().distinct('category'))
+        cat_list = list(MD.transactions_table.find().distinct('category'))
         cat_list.extend(['Add new category...'])
     else:
-        cat_list.extend(transactions_table.find().distinct('category'))
+        cat_list.extend(MD.transactions_table.find().distinct('category'))
     return cat_list

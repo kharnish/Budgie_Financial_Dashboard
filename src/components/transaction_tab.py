@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date
 
-from utils import zero_params_dict, MT, get_mongo_transactions, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
+from utils import zero_params_dict, MD, get_mongo_transactions, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
 
 
 def make_table(conf_dict):
@@ -133,7 +133,7 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
 )
 def update_table_data(change_data):
     if change_data:
-        MT.edit_transaction(change_data)
+        MD.edit_transaction(change_data)
     return ''
 
 
@@ -191,7 +191,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         enabled = False
 
     elif trigger == 'transact-delete.n_clicks':
-        MT.delete_transaction(row_data)
+        MD.delete_transaction(row_data)
         update_tab = True
 
     elif trigger == 'transact-edit.n_clicks':
@@ -229,10 +229,10 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
             for r in row_data:
                 for key, val in update_dict.items():
                     r[key] = val
-            MT.edit_many_transactions(row_data)
+            MD.edit_many_transactions(row_data)
             # TODO Update Table
             if new_account:
-                MT.add_account(new_account)
+                MD.add_account(new_account)
             category = None
             new_category = None
             amount = None

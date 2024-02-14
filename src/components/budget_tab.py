@@ -3,7 +3,7 @@ from dash import Dash, callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
-from utils import zero_params_dict, get_mongo_transactions, MT, update_layout_axes, COLORS, transactions_table, budget_table, get_categories_list
+from utils import zero_params_dict, get_mongo_transactions, MD, update_layout_axes, COLORS, get_categories_list
 
 
 def make_budget_plot(conf_dict):
@@ -16,7 +16,7 @@ def make_budget_plot(conf_dict):
 
     """
     budget_dict = {}
-    for item in budget_table.find():
+    for item in MD.budget_table.find():
         budget_dict[item['category']] = item['value']
 
     # TODO Limit the budget plot to only show one month
@@ -106,7 +106,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
 
     if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value', 'budget-value-input.value']:
         if budget_category is not None:
-            bv = list(budget_table.find({'category': budget_category}))
+            bv = list(MD.budget_table.find({'category': budget_category}))
             if len(bv) > 0:
                 budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
                 delete = {'float': 'right'}
@@ -115,9 +115,9 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         is_open = True
         categories = get_categories_list()
     elif trigger == 'modal-submit.n_clicks':
-        categories = list(transactions_table.find().distinct('category'))
+        categories = list(MD.transactions_table.find().distinct('category'))
         if budget_category != 'Select category...' and budget_value != '$ 0':
-            MT.add_budget_item(budget_category, budget_value)
+            MD.add_budget_item(budget_category, budget_value)
             update_tab = True
             budget_category = None
             budget_value = None
@@ -125,7 +125,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
             is_open = True
             msg_str = 'You must specify category and budget amount for that category'
     elif trigger == 'modal-delete.n_clicks':
-        MT.rm_budget_item(budget_category, budget_value)
+        MD.rm_budget_item(budget_category, budget_value)
         update_tab = True
         budget_category = None
         budget_value = None

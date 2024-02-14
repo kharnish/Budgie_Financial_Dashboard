@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-from utils import zero_params_dict, update_layout_axes, get_mongo_transactions, get_accounts_list, accounts_table
+from utils import zero_params_dict, MD, update_layout_axes, get_mongo_transactions, get_accounts_list
 
 
 def make_net_worth_plot(conf_dict):
@@ -23,53 +23,60 @@ def make_net_worth_plot(conf_dict):
     transactions = get_mongo_transactions(all_time_config)
     transactions = transactions.drop(transactions[(transactions['account name'] == 'Venmo') & (transactions.notes.str.contains('Source'))].index)
 
-    # Get metadata for each account
-    accounts = pd.DataFrame(accounts_table.find())
+    if len(transactions) == 0 or transactions.iloc[0].description == 'No Available Data':
+        fig_obj = go.Figure()
+        update_layout_axes(fig_obj)
+        return fig_obj
 
-    # Make figure
-    fig_obj = go.Figure()
+    else:
 
-    # Get net worth every week for past 6 months
-    days = [date.today()]
-    for i in range(1, 26):
-        days.append(date(days[-1].year, days[-1].month, days[-1].day) - timedelta(days=7))
+        # Get metadata for each account
+        accounts = pd.DataFrame(MD.accounts_table.find())
 
-    net_worth = []
-    val_dict = {}
-    for end_day in days:
-        this_month = transactions[transactions['date'].dt.date < end_day]
-        net_worth.append(this_month['amount'].sum())
-        for acc in get_accounts_list():
-            acc_status = accounts[accounts['account name'] == acc]
-            grp = this_month[this_month['account name'] == acc]
-            current_val = grp['amount'].sum() + float(acc_status['initial balance'].iloc[0])
-            if abs(current_val) < 0.001:
-                current_val = 0
-            try:
-                val_dict[acc].append(current_val)
-            except KeyError:
-                val_dict[acc] = [current_val]
+        # Make figure
+        fig_obj = go.Figure()
 
-    # Convert account net worth data to dataframe to drop accounts that are closed and sort
-    val_df = pd.DataFrame(val_dict)
-    val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
-    recent_worth = val_df.iloc[0]
-    recent_worth = recent_worth.sort_values(ascending=False)
+        # Get net worth every week for past 6 months
+        days = [date.today()]
+        for i in range(1, 26):
+            days.append(date(days[-1].year, days[-1].month, days[-1].day) - timedelta(days=7))
 
-    # Plot the account and overall net worth data
-    for acc in recent_worth.index:
-        if recent_worth[acc] < 0:
-            stackgroup = 'one'
-        else:
-            stackgroup = 'two'
-        fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup))
+        net_worth = []
+        val_dict = {}
+        for end_day in days:
+            this_month = transactions[transactions['date'].dt.date < end_day]
+            net_worth.append(this_month['amount'].sum())
+            for acc in get_accounts_list():
+                acc_status = accounts[accounts['account name'] == acc]
+                grp = this_month[this_month['account name'] == acc]
+                current_val = grp['amount'].sum() + float(acc_status['initial balance'].iloc[0])
+                if abs(current_val) < 0.001:
+                    current_val = 0
+                try:
+                    val_dict[acc].append(current_val)
+                except KeyError:
+                    val_dict[acc] = [current_val]
 
-    fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
-                                 marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3}))
+        # Convert account net worth data to dataframe to drop accounts that are closed and sort
+        val_df = pd.DataFrame(val_dict)
+        val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
+        recent_worth = val_df.iloc[0]
+        recent_worth = recent_worth.sort_values(ascending=False)
 
-    # Standard figure layout
-    update_layout_axes(fig_obj)
-    return fig_obj
+        # Plot the account and overall net worth data
+        for acc in recent_worth.index:
+            if recent_worth[acc] < 0:
+                stackgroup = 'one'
+            else:
+                stackgroup = 'two'
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup))
+
+        fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
+                                     marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3}))
+
+        # Standard figure layout
+        update_layout_axes(fig_obj)
+        return fig_obj
 
 
 net_worth_tab = dcc.Tab(label="Net Worth", value='Net Worth', children=[

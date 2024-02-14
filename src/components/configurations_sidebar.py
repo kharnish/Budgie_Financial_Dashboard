@@ -8,7 +8,7 @@ from io import StringIO
 
 import pandas as pd
 
-from utils import zero_params_dict, get_accounts_list, get_categories_list, MT
+from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
 configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
                                   children=[
@@ -279,7 +279,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
-            MT.add_one_transaction(category, amount, t_date, description, account, note)
+            MD.add_one_transaction(category, amount, t_date, description, account, note)
             category = 'unknown'
             amount = '$ 0'
             t_date = date.today()
@@ -352,9 +352,9 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            results = MT.add_transactions(m, account)
+            results = MD.add_transactions(m, account)
             if new_account:
-                MT.add_account(new_account)
+                MD.add_account(new_account)
             if isinstance(results, int):
                 if results == 0:
                     msg.append(f"File {i + 1}: No new transactions to upload")

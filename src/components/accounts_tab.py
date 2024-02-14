@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import pandas as pd
 
 
-from utils import zero_params_dict, accounts_table
+from utils import zero_params_dict, MD
 
 
 def make_accounts_table(conf_dict):
@@ -17,7 +17,11 @@ def make_accounts_table(conf_dict):
 
     """
     # Query and organize account data
-    accounts = pd.DataFrame(accounts_table.find())
+    accounts = pd.DataFrame(MD.accounts_table.find())
+
+    if len(accounts) == 0:
+        return {'data': ['No accounts'], 'columns': [{"field": 'Account Name'}]}
+
     accounts = accounts.drop(columns=['_id'])
     accounts = accounts.sort_values('account name')
     data = accounts.to_dict('records')

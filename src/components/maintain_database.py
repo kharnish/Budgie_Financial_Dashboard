@@ -12,10 +12,10 @@ class MaintainDatabase:
     def __init__(self):
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
-        client = client_mongo[os.getenv("MONGO_DB")]
-        self.transaction_table = client[os.getenv("TRANSACTIONS_CLIENT")]
-        self.budget_table = client[os.getenv("BUDGET_CLIENT")]
-        self.accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
+        self._client = client_mongo[os.getenv("MONGO_DB")]
+        self.transactions_table = self._client[os.getenv("TRANSACTIONS_CLIENT")]
+        self.budget_table = self._client[os.getenv("BUDGET_CLIENT")]
+        self.accounts_table = self._client[os.getenv("ACCOUNTS_CLIENT")]
         self.autocategories = None
 
     def add_transactions(self, sheet, account=None):
@@ -93,7 +93,7 @@ class MaintainDatabase:
             if account_labels:
                 account = row['account name']
 
-            duplicates = list(self.transaction_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1}))
+            duplicates = list(self.transactions_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1}))
 
             if len(duplicates) > 0:
                 for dup in duplicates:
@@ -133,7 +133,7 @@ class MaintainDatabase:
 
         # Insert transactions into database
         if len(transaction_list) > 0:
-            self.transaction_table.insert_many(transaction_list)
+            self.transactions_table.insert_many(transaction_list)
         return len(transaction_list)
 
     def add_one_transaction(self, category, amount, t_date, description, account, note):
@@ -146,7 +146,7 @@ class MaintainDatabase:
                        'original description': description,
                        'account name': account,
                        'notes': note}
-        return self.transaction_table.insert_one(transaction)
+        return self.transactions_table.insert_one(transaction)
 
     @staticmethod
     def _make_transaction_dict(td, category, account):
@@ -163,7 +163,7 @@ class MaintainDatabase:
 
     def _get_categories(self, account):
         """Get all the descriptions corresponding categories"""
-        k = list(self.transaction_table.aggregate([
+        k = list(self.transactions_table.aggregate([
             {'$match': {  # match with only this account
                 'account name': account}},
             {'$group': {  # get the most recent, unique original description
@@ -192,7 +192,7 @@ class MaintainDatabase:
         new_dict.pop('_id')
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']
-        return self.transaction_table.update_one(old_dict, {'$set': new_dict})
+        return self.transactions_table.update_one(old_dict, {'$set': new_dict})
 
     def edit_many_transactions(self, transaction_list):
         for new_trans in transaction_list:
@@ -201,14 +201,14 @@ class MaintainDatabase:
             except ValueError:
                 new_trans['date'] = datetime.strptime(new_trans['date'], '%m-%d-%Y')
             tid = new_trans.pop('_id')
-            self.transaction_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
+            self.transactions_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
 
     def delete_transaction(self, transaction_dict):
         """Delete a list of transactions from the Transactions table"""
         for trans in transaction_dict:
             trans.pop('_id')
             trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
-            self.transaction_table.delete_one(trans)
+            self.transactions_table.delete_one(trans)
 
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
@@ -226,6 +226,26 @@ class MaintainDatabase:
         """Add new account in database with current status and beginning balance for net worth"""
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
+    def export_database_to_csv(self):
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+            data = coll.find()
+            this_data = pd.DataFrame(data)
+            try:
+                this_data = this_data.drop(columns=['_id'])
+            except KeyError:
+                pass
+            this_data.to_csv(coll.name + '.csv', index=False)
+
+    def import_data_from_csv(self):
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+            for file_name in os.listdir():
+                if file_name.endswith('.csv'):
+                    if file_name[:-4] == coll.name:
+                        df = pd.read_csv(file_name)
+                        coll.insert_many(df.to_dict('records'))
+
 
 if __name__ == '__main__':
     md = MaintainDatabase()
+    # md.export_database_to_csv()
+    md.import_data_from_csv()
