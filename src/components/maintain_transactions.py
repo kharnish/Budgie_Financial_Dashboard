@@ -1,6 +1,6 @@
 from bson.objectid import ObjectId
 from datetime import datetime, timedelta
-from difflib import SequenceMatcher, get_close_matches
+from difflib import get_close_matches
 from dotenv import load_dotenv
 import numpy as np
 import os

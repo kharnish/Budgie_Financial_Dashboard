@@ -1,5 +1,5 @@
 from dash import dcc, html
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -8,8 +8,7 @@ from utils import zero_params_dict, update_layout_axes, get_mongo_transactions, 
 
 
 def make_net_worth_plot(conf_dict):
-    """Make a plot of the net worth of each account over time for the past 6 months
-    # TODO make the time window shown based on the
+    """Make a plot of the net worth of each account over the time of the Time Window parameter
 
     Args:
         conf_dict: Dictionary of the configuration parameters.
@@ -29,16 +28,31 @@ def make_net_worth_plot(conf_dict):
     # Make figure
     fig_obj = go.Figure()
 
-    # Get net worth every week for past 6 months
-    days = [date.today()]
-    for i in range(1, 26):
-        days.append(date(days[-1].year, days[-1].month, days[-1].day) - timedelta(days=7))
+    # Get each date to query data, filtering by day/week/month based on overall length of time window
+    start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
+    end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+    display_delta = end_date - start_date
+    days = [end_date]
+    if display_delta < timedelta(days=32):
+        iter_delta = timedelta(days=1)
+    elif display_delta < timedelta(days=365):
+        iter_delta = timedelta(days=7)
+    else:
+        iter_delta = timedelta(days=30)
 
+    while True:
+        previous_date = date(days[-1].year, days[-1].month, days[-1].day) - iter_delta
+        days.append(previous_date)
+        if previous_date <= start_date:
+            break
+
+    # Calculate net worth at each date
     net_worth = []
     val_dict = {}
+    initial_net_worth = accounts['initial balance'].sum()
     for end_day in days:
         this_month = transactions[transactions['date'].dt.date < end_day]
-        net_worth.append(this_month['amount'].sum())
+        net_worth.append(this_month['amount'].sum() + initial_net_worth)
         for acc in get_accounts_list():
             acc_status = accounts[accounts['account name'] == acc]
             grp = this_month[this_month['account name'] == acc]

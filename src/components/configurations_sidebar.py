@@ -206,7 +206,7 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
             date_range_style = {'display': 'none'}
         elif time_filter == 'All Time':
             new_params['end_date'] = date.today()
-            new_params['start_date'] = date(2000, 1, 1)
+            new_params['start_date'] = list(MT.transaction_table.find().sort({'date': 1}).limit(1))[0]['date'].date()
             date_range_style = {'display': 'none'}
         elif time_filter == 'Custom':
             date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
