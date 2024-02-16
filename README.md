@@ -63,9 +63,10 @@ and [Miniconda](https://docs.anaconda.com/free/miniconda/).
 
 4. In a command prompt, run the command `mongod` to start the database
 
-6. In a second command prompt, run the command `mongosh` to start the database shell. Here, you can manipulate the database if you're a command line warrior.
+5. In a second command prompt, run the command `mongosh` to start the database shell. Here, you can manipulate the database if you're a command line warrior. Also, 
+don't worry about closing the command prompts when you're done, Mongo saves all the data.
 
-7. Now, you can run `app.py` and start using Budgie by uploading a transaction CSV file to a new account
+6. Now, you can run `app.py` and start using Budgie by uploading a transaction CSV file to a new account
 
 
 ## Security
