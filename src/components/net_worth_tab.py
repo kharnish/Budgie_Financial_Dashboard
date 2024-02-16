@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-from utils import zero_params_dict, update_layout_axes, get_mongo_transactions, get_accounts_list, accounts_table
+from utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
 
 
 def make_net_worth_plot(conf_dict):
@@ -19,11 +19,14 @@ def make_net_worth_plot(conf_dict):
     # Ensure it queries all transactions since the beginning
     all_time_config = zero_params_dict()
     all_time_config['start_date'] = '2000-01-01'
-    transactions = get_mongo_transactions(all_time_config)
+    transactions = MD.query_transactions(all_time_config)
     transactions = transactions.drop(transactions[(transactions['account name'] == 'Venmo') & (transactions.notes.str.contains('Source'))].index)
 
     # Get metadata for each account
-    accounts = pd.DataFrame(accounts_table.find())
+    if isinstance(MD.accounts_table, pd.DataFrame):
+        accounts = MD.accounts_table.find()
+    else:
+        accounts = pd.DataFrame(MD.accounts_table.find())
 
     # Make figure
     fig_obj = go.Figure()

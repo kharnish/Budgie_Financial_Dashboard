@@ -1,23 +1,10 @@
 from datetime import date, datetime
 from dotenv import load_dotenv
 import os
-import pandas as pd
-import pymongo
 
 from maintain_transactions import MaintainDatabase
+from maintain_transactions_csv import MaintainCSV
 
-
-load_dotenv()
-client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
-client = client_mongo[os.getenv("MONGO_DB")]
-transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
-budget_table = client[os.getenv("BUDGET_CLIENT")]
-accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
-
-MT = MaintainDatabase()
-
-EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
-                                            'amount': [0], 'account name': [''], 'notes': ['']})
 EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
 EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
 
@@ -35,6 +22,18 @@ COLORS = {
     }
 }
 
+# Instantiate data interface
+load_dotenv()
+if os.getenv("MONGO_HOST") is not None:
+    MD = MaintainDatabase()
+    print(f"Using Mongo data from {os.getenv('MONGO_HOST')}")
+elif os.getenv("DATA_DIR") is not None:
+    MD = MaintainCSV()
+    print(f"Using CSV data from {os.getenv('DATA_DIR')}")
+else:
+    print("You must specify either MONGO_HOST or DATA_DIR in the .env file")
+    quit()
+
 
 def zero_params_dict():
     """Create empty dictionary with parameter keys.
@@ -46,30 +45,6 @@ def zero_params_dict():
     start_of_month = date(today.year, today.month, 1)
     return {'field_filter': 'Category', 'time_filter': 'This Month', 'filter_value': [], 'plot_type': 'bar',
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
-
-
-def get_mongo_transactions(conf_dict):
-    """Query Mongo according to configuration dict parameters
-
-    Args:
-         conf_dict:
-
-    Returns: Pandas Dataframe of transactions
-    """
-    if len(conf_dict['filter_value']) == 0:
-        mongo_filter = {}
-    else:
-        mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
-
-    transactions = pd.DataFrame(transactions_table.find({
-        'date': {
-            '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
-            '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
-        **mongo_filter}))
-    if len(transactions) == 0:
-        transactions = EMPTY_TRANSACTION
-
-    return transactions
 
 
 def update_layout_axes(fig_obj):
@@ -95,10 +70,10 @@ def get_accounts_list(extra=''):
     """
     acc_list = []
     if extra == 'new':
-        acc_list = list(transactions_table.find().distinct('account name'))
+        acc_list = list(MD.transactions_table.find().distinct('account name'))
         acc_list.extend(['Add new account...'])
     else:
-        acc_list.extend(transactions_table.find().distinct('account name'))
+        acc_list.extend(MD.transactions_table.find().distinct('account name'))
     return acc_list
 
 
@@ -109,8 +84,8 @@ def get_categories_list(extra=''):
     """
     cat_list = []
     if extra == 'new':
-        cat_list = list(transactions_table.find().distinct('category'))
+        cat_list = list(MD.transactions_table.find().distinct('category'))
         cat_list.extend(['Add new category...'])
     else:
-        cat_list.extend(transactions_table.find().distinct('category'))
+        cat_list.extend(MD.transactions_table.find().distinct('category'))
     return cat_list

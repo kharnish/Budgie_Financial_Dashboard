@@ -10,22 +10,31 @@ import pymongo
 
 class MaintainDatabase:
     def __init__(self):
+        self.transactions_table = None
+        self.budget_table = None
+        self.accounts_table = None
+        self.load_initial_data()
+        self.autocategories = None
+        self.empty_transaction = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
+                                                         'amount': [0], 'account name': [''], 'notes': ['']})
+
+    def load_initial_data(self):
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
         client = client_mongo[os.getenv("MONGO_DB")]
-        self.transaction_table = client[os.getenv("TRANSACTIONS_CLIENT")]
+        self.transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
         self.budget_table = client[os.getenv("BUDGET_CLIENT")]
         self.accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
-        self.autocategories = None
 
     def add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
+
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
             df = sheet
 
-        # Extra check if it's a venmo CSV
+            # Extra check if it's a venmo CSV
         if df.columns[1] == 'Unnamed: 1':
             if isinstance(sheet, str):
                 df = pd.read_csv(sheet, header=2)
@@ -42,7 +51,7 @@ class MaintainDatabase:
             df['date'] = [val.split('T')[0] for val in df['date']]
             df['notes'] = 'Source: ' + df['Funding Source'].replace({'Venmo balance': ''})
 
-        # Standardize sheet columns
+            # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
         if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
@@ -93,10 +102,19 @@ class MaintainDatabase:
             if account_labels:
                 account = row['account name']
 
-            duplicates = list(self.transaction_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1}))
+            duplicates = self.transactions_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1})
+            if isinstance(duplicates, pd.DataFrame):
+                len_dups = len(duplicates)
+                duplicates = duplicates.iterrows()
+            else:
+                duplicates = list(duplicates)
+                len_dups = len(duplicates)
 
-            if len(duplicates) > 0:
+            if len_dups > 0:
                 for dup in duplicates:
+                    if isinstance(dup, tuple):
+                        dup = dup[1]
+
                     if dup['date'] > row['date']:
                         continue
                     if dup['date'] == row['date']:
@@ -109,13 +127,13 @@ class MaintainDatabase:
                                 break
                             else:
                                 print(f"Did not insert possible duplicate, but check different description: "
-                                      f"New: {row['date']}, {dup['original description']} / Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                      f"New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is overt 10 days from the duplicate, it's probably a recurring and not a duplicate
                         if abs((dup['date'] - row['date'])) > timedelta(days=10):
-                            print(f"Inserted possible repeating transaction: New: {row['date']}, {dup['original description']} / "
+                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} / "
                                   f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             break
@@ -124,7 +142,7 @@ class MaintainDatabase:
                             if matches:
                                 break
                             else:
-                                print(f"Did not insert possible duplicate item: New: {row['date']}, {dup['original description']} / "
+                                print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
                                       f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                                 break
             else:
@@ -133,7 +151,10 @@ class MaintainDatabase:
 
         # Insert transactions into database
         if len(transaction_list) > 0:
-            self.transaction_table.insert_many(transaction_list)
+            if isinstance(self.transactions_table, pd.DataFrame):
+                self.transactions_table = pd.concat([self.transactions_table, pd.DataFrame(transaction_list)])
+            else:
+                self.transactions_table.insert_many(transaction_list)
         return len(transaction_list)
 
     def add_one_transaction(self, category, amount, t_date, description, account, note):
@@ -146,7 +167,7 @@ class MaintainDatabase:
                        'original description': description,
                        'account name': account,
                        'notes': note}
-        return self.transaction_table.insert_one(transaction)
+        return self.transactions_table.insert_one(transaction)
 
     @staticmethod
     def _make_transaction_dict(td, category, account):
@@ -163,7 +184,7 @@ class MaintainDatabase:
 
     def _get_categories(self, account):
         """Get all the descriptions corresponding categories"""
-        k = list(self.transaction_table.aggregate([
+        k = list(self.transactions_table.aggregate([
             {'$match': {  # match with only this account
                 'account name': account}},
             {'$group': {  # get the most recent, unique original description
@@ -185,6 +206,32 @@ class MaintainDatabase:
         except (ValueError, AttributeError):
             return row['category'] if row['category'] != '' else 'unknown'
 
+    def query_transactions(self, conf_dict):
+        """Query Mongo according to configuration dict parameters
+
+        Args:
+             conf_dict:
+
+        Returns: Pandas Dataframe of transactions
+        """
+        if len(conf_dict['filter_value']) == 0:
+            mongo_filter = {}
+        else:
+            mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
+
+        transactions = pd.DataFrame(self.transactions_table.find({
+            'date': {
+                '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
+                '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
+            **mongo_filter}))
+        if len(transactions) == 0:
+            transactions = self.empty_transaction
+
+        return transactions
+
+    def get_oldest_transaction(self):
+        return list(self.transactions_table.find().sort({'date': 1}).limit(1))[0]['date'].date()
+
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
         change_dict['data']['date'] = datetime.strptime(change_dict['data']['date'], '%m-%d-%Y')
@@ -192,23 +239,24 @@ class MaintainDatabase:
         new_dict.pop('_id')
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']
-        return self.transaction_table.update_one(old_dict, {'$set': new_dict})
+        return self.transactions_table.update_one(old_dict, {'$set': new_dict})
 
     def edit_many_transactions(self, transaction_list):
+        """Edit data for multiple transactions at one time"""
         for new_trans in transaction_list:
             try:
                 new_trans['date'] = datetime.strptime(new_trans['date'], '%Y-%m-%d')
             except ValueError:
                 new_trans['date'] = datetime.strptime(new_trans['date'], '%m-%d-%Y')
             tid = new_trans.pop('_id')
-            self.transaction_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
+            self.transactions_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
 
     def delete_transaction(self, transaction_dict):
         """Delete a list of transactions from the Transactions table"""
         for trans in transaction_dict:
             trans.pop('_id')
             trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
-            self.transaction_table.delete_one(trans)
+            self.transactions_table.delete_one(trans)
 
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
@@ -226,6 +274,13 @@ class MaintainDatabase:
         """Add new account in database with current status and beginning balance for net worth"""
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
+    def export_data_to_csv(self, root_dir=''):
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+            data = coll.find()
+            this_data = pd.DataFrame(data)
+            this_data.to_csv(os.path.join(root_dir, coll.name + '.csv'), index=False, date_format='%Y-%m-%d')
+
 
 if __name__ == '__main__':
     md = MaintainDatabase()
+    md.export_data_to_csv('\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\budget_tracker\\money_data')

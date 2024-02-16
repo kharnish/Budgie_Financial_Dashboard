@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import pandas as pd
 
 
-from utils import zero_params_dict, accounts_table
+from utils import zero_params_dict, MD
 
 
 def make_accounts_table(conf_dict):
@@ -17,8 +17,8 @@ def make_accounts_table(conf_dict):
 
     """
     # Query and organize account data
-    accounts = pd.DataFrame(accounts_table.find())
-    accounts = accounts.drop(columns=['_id'])
+    accounts = pd.DataFrame(MD.accounts_table.find())
+    accounts = accounts.drop(columns=['_id'])  # Only for Mongo query
     accounts = accounts.sort_values('account name')
     data = accounts.to_dict('records')
     columns = [{"field": i} for i in accounts.columns]
