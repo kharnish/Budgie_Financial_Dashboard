@@ -89,7 +89,6 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                  style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                                           html.Div(style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
                                                    children=[html.Button(children=["Add Manual Transaction ", html.I(className="fa-solid fa-plus")], id="manual-button")]),
-
                                           dbc.Modal(id="transaction-modal", is_open=False, children=[
                                               dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                                               dbc.ModalBody(children=[
@@ -131,6 +130,14 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                              id="t-modal-submit", className="ms-auto", style={'float': 'left'})]
                                               ),
                                           ]),
+
+                                          # Overwrite the data files if it's being pulled from CSV
+                                          html.Div(id='export-container', style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
+                                                   children=[html.Button(children=["Export Data ", html.I(className="fa-solid fa-download")],
+                                                                         id="export-button")]),
+                                          html.I(id='export-message',
+                                                 style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
+
                                       ]),
                                   ])
 
@@ -371,3 +378,23 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
 
     return msg, upload_button, account_input, acc_list, update_tab
+
+
+@callback(
+    Output('export-message', 'children'),
+    Output('export-container', 'style'),
+    Input('export-button', 'n_clicks'),
+)
+def export_data(export):
+    """If pulling data from CSV, export the files to the CSV where they're currently located"""
+    msg = None
+    style = {'display': 'none'}
+    if isinstance(MD.transactions_table, pd.DataFrame):
+        style = {'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'}
+
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'export-button.n_clicks':
+        MD.export_data_to_csv()
+        msg = f"Saved files to {MD.file_dir}"
+
+    return msg, style

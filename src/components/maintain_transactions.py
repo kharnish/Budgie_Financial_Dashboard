@@ -275,6 +275,7 @@ class MaintainDatabase:
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
     def export_data_to_csv(self, root_dir=''):
+        """Dave database data to csv files"""
         for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
@@ -283,4 +284,3 @@ class MaintainDatabase:
 
 if __name__ == '__main__':
     md = MaintainDatabase()
-    md.export_data_to_csv('\\\\spacenet\\BranchData\\Code 8121\\Harnish\\Aloha_Data_Visualizer\\budget_tracker\\money_data')

@@ -45,7 +45,7 @@ class BudgieDF(pd.DataFrame):
 class MaintainCSV(MaintainDatabase):
     def __init__(self):
         super().__init__()
-        self.file_dir = None
+        self.file_dir = None if self.file_dir is None else self.file_dir
 
     def load_initial_data(self):
         load_dotenv()
@@ -55,7 +55,7 @@ class MaintainCSV(MaintainDatabase):
         self.budget_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'budget.csv')))
         self.accounts_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'accounts.csv')))
 
-    def save_files(self):
+    def export_data_to_csv(self):
         """Save all data files to a CSV"""
         self.transactions_table.to_csv(os.path.join(self.file_dir, 'transactions.csv'), index=False)
         self.budget_table.to_csv(os.path.join(self.file_dir, 'budget.csv'), index=False)
