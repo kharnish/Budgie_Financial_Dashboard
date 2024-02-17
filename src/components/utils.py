@@ -6,7 +6,7 @@ from maintain_transactions import MaintainDatabase
 from maintain_transactions_csv import MaintainCSV
 
 EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
-EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
+EXCLUDE_FROM_TABLE = ['_id', 'original description']
 
 COLORS = {
     'light': {
@@ -74,6 +74,11 @@ def get_accounts_list(extra=''):
         acc_list.extend(['Add new account...'])
     else:
         acc_list.extend(MD.transactions_table.find().distinct('account name'))
+
+    try:  # Quick check for when there's actually no accounts available
+        acc_list.remove('None')
+    except ValueError:
+        pass
     return acc_list
 
 

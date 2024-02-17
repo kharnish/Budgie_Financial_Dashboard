@@ -360,7 +360,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            results = MD.add_transactions(m, account)
+            results = MD.load_transactions(m, account)
             if new_account:
                 MD.add_account(new_account)
             if isinstance(results, int):

@@ -6,10 +6,10 @@ Process your bank transactions in a locally-hosted database or set of CSV files 
 
 ![app screenshot](/src/assets/screenshot.PNG)
 
-## Usage
+## Getting Started
 There are two ways to store data for Budgie: a Mongo database or a set of CSV files.
 
-Note: I've not tested the limit of how large the CSV file can be, so you may experience slower performance if you have a large number of transactions (i.e. 10s of thousands of transactions).
+Note: I've not tested the limit of how large the CSV file can be, so you may experience slower performance if you have a large number of transactions (i.e. tens of thousands of transactions).
 
 ### Mongo Database
 Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
@@ -41,12 +41,8 @@ Create a new folder to hold your CSV data, and store the path in a `.env` file i
 When you add new transactions or update your budget, Budgie will automatically rewrite the CSV with the new data. 
 Alternatively, you can click the "Save" button in the header to manually export your data.
 
-### Special note about Venmo
-Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 
-transaction notes as "Source: [source information]" in order to properly calculate your net worth. 
 
-
-## More Basic Getting Started
+## Getting Started with Python and MongoDB
 
 #### Getting Python 
 My preference of IDE and package manager is [PyCharm Community](https://www.jetbrains.com/pycharm/download/?section=windows) 
@@ -87,4 +83,10 @@ It should go without saying, but please do not commit any personal information i
 
 ## Troubleshooting
 
-If your bank's CSV fails to be uploaded, make an issue that includes the header of the CSV.
+### CSV file upload fails
+If your bank's CSV fails to be uploaded, make an issue that includes the header of the CSV and a line of a representative credit (+) and debit (-) to the account.
+
+### Special note about Venmo
+Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 
+transaction notes as "Source: [source information]" in order to properly calculate your net worth. 
+

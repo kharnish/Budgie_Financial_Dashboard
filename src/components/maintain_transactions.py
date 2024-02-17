@@ -12,16 +12,19 @@ BUDGET_CLIENT = 'budget'
 ACCOUNTS_CLIENT = 'accounts'
 CATEGORIES_CLIENT = 'categories'
 
+EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': ['None'], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
+                                            'amount': [0], 'account name': ['None'], 'notes': ['None']})
+
 
 class MaintainDatabase:
     def __init__(self):
         self.transactions_table = None
         self.budget_table = None
         self.accounts_table = None
-        self.load_initial_data()
+        self.categories_table = None
         self.autocategories = None
-        self.empty_transaction = pd.DataFrame.from_dict({'_id': [''], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
-                                                         'amount': [0], 'account name': [''], 'notes': ['']})
+
+        self.load_initial_data()
 
     def load_initial_data(self):
         load_dotenv()
@@ -32,7 +35,16 @@ class MaintainDatabase:
         self.accounts_table = client[ACCOUNTS_CLIENT]
         self.categories_table = client[CATEGORIES_CLIENT]
 
-    def add_transactions(self, sheet, account=None):
+    def load_transactions(self, sheet, account=None):
+        """Import transaction CSV and write many transactions to database"""
+        transaction_list = self._add_transactions(sheet, account)
+
+        # Insert transactions into database
+        if len(transaction_list) > 0:
+            self.transactions_table.insert_many(transaction_list)
+        return len(transaction_list)
+
+    def _add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
@@ -154,13 +166,7 @@ class MaintainDatabase:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
 
-        # Insert transactions into database
-        if len(transaction_list) > 0:
-            if isinstance(self.transactions_table, pd.DataFrame):
-                self.transactions_table = pd.concat([self.transactions_table, pd.DataFrame(transaction_list)])
-            else:
-                self.transactions_table.insert_many(transaction_list)
-        return len(transaction_list)
+        return transaction_list
 
     def add_one_transaction(self, category, amount, t_date, description, account, note):
         """Add a single manual transaction to the database"""
@@ -168,7 +174,6 @@ class MaintainDatabase:
                        'category': category,
                        'description': description,
                        'amount': amount,
-                       'currency': 'USD',
                        'original description': description,
                        'account name': account,
                        'notes': note}
@@ -181,7 +186,6 @@ class MaintainDatabase:
                                'category': category,
                                'description': td['description'],
                                'amount': td['amount'],
-                               'currency': 'USD',
                                'original description': td['original description'],
                                'account name': account,
                                'notes': td.get('notes')}
@@ -230,7 +234,7 @@ class MaintainDatabase:
                 '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
             **mongo_filter}))
         if len(transactions) == 0:
-            transactions = self.empty_transaction
+            transactions = EMPTY_TRANSACTION
 
         return transactions
 
