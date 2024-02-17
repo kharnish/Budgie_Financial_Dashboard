@@ -7,7 +7,9 @@ import os
 import pandas as pd
 import pymongo
 
-TRANSACTIONS_CLIENT = 'transactions'
+import utils
+
+TRANSACTIONS_CLIENT = 'transactions_3'
 BUDGET_CLIENT = 'budget'
 ACCOUNTS_CLIENT = 'accounts'
 CATEGORIES_CLIENT = 'categories'
@@ -276,7 +278,5 @@ class MaintainDatabase:
 
 if __name__ == '__main__':
     md = MaintainDatabase()
-    md.add_category('', 'food')
-
     # md.export_database_to_csv()
     # md.import_data_from_csv()

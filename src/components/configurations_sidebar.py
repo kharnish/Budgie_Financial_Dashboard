@@ -279,6 +279,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
+                    MD.add_category('new_category')
             MD.add_one_transaction(category, amount, t_date, description, account, note)
             category = 'unknown'
             amount = '$ 0'

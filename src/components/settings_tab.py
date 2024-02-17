@@ -20,7 +20,7 @@ def make_accounts_table(conf_dict):
     accounts = pd.DataFrame(MD.accounts_table.find())
 
     if len(accounts) == 0:
-        return {'data': ['No accounts'], 'columns': [{"field": 'Account Name'}]}
+        return {'data': [{'Account Name': 'No accounts'}], 'columns': [{"field": 'Account Name'}]}
 
     accounts = accounts.drop(columns=['_id'])
     accounts = accounts.sort_values('account name')
@@ -56,14 +56,14 @@ def make_categories_table(conf_dict):
     cats = pd.DataFrame(MD.categories_table.find())
 
     if len(cats) == 0:
-        return {'data': ['No accounts'], 'columns': [{"field": 'Account Name'}]}
+        return {'data': [{'Category Name': 'No categories', 'Parent': 'NA'}], 'columns': [{"field": 'Category Name'}, {"field": 'Parent'}]}
 
     categories = cats.drop(columns=['_id'])
-    parents = categories[categories['parent'].isnull()]
-    parents = parents.sort_values('category name')
-    parents_list = list(parents['category name']) + ['Make parent']
+    childless = categories[categories['parent'].isnull()]
+    parent = categories[~categories['parent'].isnull()]
+    parents_list = list(childless['category name']) + list(parent['parent'].unique())
+    parents_list = sorted(parents_list) + ['Make parent']
     categories = categories.sort_values(['parent', 'category name'])
-    categories = categories.dropna(axis=0)
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -86,7 +86,7 @@ cat_tab = make_categories_table(zero_params_dict())
 settings_tab = dcc.Tab(label="Settings", value='Settings', children=[
     html.Div(style={'width': '100%', 'height': '700px', 'padding': '5px', 'align': 'center'}, className='tab-body',
              children=[
-                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px', 'background-color': 'lightgreen'},
+                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px'},
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
@@ -99,7 +99,7 @@ settings_tab = dcc.Tab(label="Settings", value='Settings', children=[
                                          columnSize="autoSize",
                                          defaultColDef={'filter': True, "resizable": True, 'sortable': True},
                                          )]),
-                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px', 'background-color': 'lightblue'},
+                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px'},
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
@@ -115,6 +115,7 @@ settings_tab = dcc.Tab(label="Settings", value='Settings', children=[
              ])
     ])
 
+
 @callback(
     Output('update-tab', 'data', allow_duplicate=True),
     Input('categories-table', 'cellValueChanged'),
@@ -123,9 +124,13 @@ settings_tab = dcc.Tab(label="Settings", value='Settings', children=[
 def update_table_data(change_data):
     update_tab = no_update
     if change_data:
+        if change_data[0]['colId'] == 'parent':
+            if change_data[0]['data']['parent'] == 'Make parent':
+                change_data[0]['data']['parent'] = None
         MD.edit_category(change_data)
         update_tab = True
     return update_tab
+
 
 @callback(
     Output('categories-delete', 'disabled'),
