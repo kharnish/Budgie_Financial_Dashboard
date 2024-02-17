@@ -301,7 +301,7 @@ class MaintainDatabase:
                 row['parent'] = None
             return self.categories_table.delete_one(row)
 
-    def export_database_to_csv(self):
+    def export_data_to_csv(self):
         """Save database data to csv files"""
         for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
             data = coll.find()

@@ -56,14 +56,9 @@ def make_categories_table(conf_dict):
     cats = pd.DataFrame(MD.categories_table.find())
 
     if len(cats) == 0:
-        return {'data': [{'Category Name': 'No categories', 'Parent': 'NA'}], 'columns': [{"field": 'Category Name'}, {"field": 'Parent'}]}
+        return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
 
-    categories = cats.drop(columns=['_id'])
-    childless = categories[categories['parent'].isnull()]
-    parent = categories[~categories['parent'].isnull()]
-    parents_list = list(childless['category name']) + list(parent['parent'].unique())
-    parents_list = sorted(parents_list) + ['Make parent']
-    categories = categories.sort_values(['parent', 'category name'])
+    categories = cats.drop(columns=['_id', 'parent'])
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -77,7 +72,7 @@ cat_tab = make_categories_table(zero_params_dict())
 configurations_tab = dcc.Tab(label="Configurations", value='Configurations', children=[
     html.Div(style={'width': '100%', 'height': '700px', 'padding': '5px', 'align': 'center'}, className='tab-body',
              children=[
-                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px'},
+                 html.Div(style={'width': '40%', 'display': 'inline-block', 'padding': '5px 15px 5px 5px'},
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
@@ -90,7 +85,7 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                          columnSize="autoSize",
                                          defaultColDef={'filter': True, "resizable": True, 'sortable': True},
                                          )]),
-                 html.Div(style={'width': '50%', 'display': 'inline-block', 'padding': '5px'},
+                 html.Div(style={'width': '60%', 'display': 'inline-block', 'padding': '5px'},
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],

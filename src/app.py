@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import Dash, callback, dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 
 from configurations_sidebar import configurations_sidebar
@@ -7,7 +7,7 @@ from trends_tab import trends_tab, make_trends_plot
 from transaction_tab import transaction_tab, make_table
 from budget_tab import budget_tab, make_budget_plot
 from net_worth_tab import net_worth_tab, make_net_worth_plot
-from configurations_tab import configurations_tab, make_accounts_table
+from configurations_tab import configurations_tab, make_accounts_table, make_categories_table
 from utils import zero_params_dict
 
 external_stylesheets = ['assets/budgie_light.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
@@ -57,6 +57,8 @@ app.layout = html.Div(
     Output('net-worth-graph', 'figure'),
     Output('accounts-table', 'rowData'),
     Output('accounts-table', 'columnDefs'),
+    Output('categories-table', 'rowData'),
+    Output('categories-table', 'columnDefs'),
 
     Input('current-config-memory', 'data'),
     Input('selection-tabs', 'value'),
@@ -77,32 +79,37 @@ def update_tab_data(current_params, which_tab, update_tab):
     if which_tab == 'Trends':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(zero_params_dict())
+        cat_dict = make_categories_table(zero_params_dict())
         return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
-            acc_dict['data'], acc_dict['columns']
+            acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Transactions':
         tab_dict = make_table(current_params)
         acc_dict = make_accounts_table(zero_params_dict())
+        cat_dict = make_categories_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
-            acc_dict['data'], acc_dict['columns']
+            acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(zero_params_dict())
+        cat_dict = make_categories_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params), make_net_worth_plot(zero_params_dict()), \
-            acc_dict['data'], acc_dict['columns']
+            acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Net Worth':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(zero_params_dict())
+        cat_dict = make_categories_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(current_params), \
-            acc_dict['data'], acc_dict['columns']
+            acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
-    elif which_tab == 'Accounts':
+    elif which_tab == 'Configurations':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(current_params)
+        cat_dict = make_categories_table(current_params)
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
-            acc_dict['data'], acc_dict['columns']
+            acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
 
 if __name__ == '__main__':
