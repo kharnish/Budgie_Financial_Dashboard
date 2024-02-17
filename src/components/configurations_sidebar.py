@@ -8,7 +8,7 @@ from io import StringIO
 
 import pandas as pd
 
-from utils import zero_params_dict, get_accounts_list, get_categories_list, MT
+from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
 configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
                                   children=[
@@ -89,7 +89,6 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                  style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                                           html.Div(style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
                                                    children=[html.Button(children=["Add Manual Transaction ", html.I(className="fa-solid fa-plus")], id="manual-button")]),
-
                                           dbc.Modal(id="transaction-modal", is_open=False, children=[
                                               dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                                               dbc.ModalBody(children=[
@@ -131,6 +130,14 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                              id="t-modal-submit", className="ms-auto", style={'float': 'left'})]
                                               ),
                                           ]),
+
+                                          # Overwrite the data files if it's being pulled from CSV
+                                          html.Div(id='export-container', style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
+                                                   children=[html.Button(children=["Export Data ", html.I(className="fa-solid fa-download")],
+                                                                         id="export-button")]),
+                                          html.I(id='export-message',
+                                                 style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
+
                                       ]),
                                   ])
 
@@ -206,7 +213,7 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
             date_range_style = {'display': 'none'}
         elif time_filter == 'All Time':
             new_params['end_date'] = date.today()
-            new_params['start_date'] = list(MT.transaction_table.find().sort({'date': 1}).limit(1))[0]['date'].date()
+            new_params['start_date'] = MD.get_oldest_transaction()
             date_range_style = {'display': 'none'}
         elif time_filter == 'Custom':
             date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
@@ -279,7 +286,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
-            MT.add_one_transaction(category, amount, t_date, description, account, note)
+            MD.add_one_transaction(category, amount, t_date, description, account, note)
             category = 'unknown'
             amount = '$ 0'
             t_date = date.today()
@@ -352,9 +359,9 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            results = MT.add_transactions(m, account)
+            results = MD.add_transactions(m, account)
             if new_account:
-                MT.add_account(new_account)
+                MD.add_account(new_account)
             if isinstance(results, int):
                 if results == 0:
                     msg.append(f"File {i + 1}: No new transactions to upload")
@@ -371,3 +378,23 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
 
     return msg, upload_button, account_input, acc_list, update_tab
+
+
+@callback(
+    Output('export-message', 'children'),
+    Output('export-container', 'style'),
+    Input('export-button', 'n_clicks'),
+)
+def export_data(export):
+    """If pulling data from CSV, export the files to the CSV where they're currently located"""
+    msg = None
+    style = {'display': 'none'}
+    if isinstance(MD.transactions_table, pd.DataFrame):
+        style = {'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'}
+
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'export-button.n_clicks':
+        MD.export_data_to_csv()
+        msg = f"Saved files to {MD.file_dir}"
+
+    return msg, style

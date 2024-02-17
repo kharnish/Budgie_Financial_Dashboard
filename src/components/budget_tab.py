@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 import pandas as pd
 import plotly.graph_objects as go
 
-from utils import zero_params_dict, get_mongo_transactions, MT, update_layout_axes, COLORS, transactions_table, budget_table, get_categories_list
+from utils import zero_params_dict, MD, update_layout_axes, COLORS, get_categories_list
 
 
 def make_budget_plot(conf_dict):
@@ -18,12 +18,16 @@ def make_budget_plot(conf_dict):
 
     """
     budget_dict = {}
-    for item in budget_table.find():
-        budget_dict[item['category']] = item['value']
+    if isinstance(MD.budget_table, pd.DataFrame):
+        for i, item in MD.budget_table.find().iterrows():
+            budget_dict[item['category']] = item['value']
+    else:
+        for item in MD.budget_table.find():
+            budget_dict[item['category']] = item['value']
 
     # TODO Limit the budget plot to only show one month
     #  Or make it show month-to-month for each category
-    transactions = get_mongo_transactions(conf_dict)
+    transactions = MD.query_transactions(conf_dict)
 
     fig_obj = go.Figure()
     for cat in budget_dict.keys():
@@ -122,9 +126,12 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     update_tab = no_update
     delete = {'display': 'none'}
 
-    if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value', 'budget-value-input.value']:
+    if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value']:
         if budget_category is not None:
-            bv = list(budget_table.find({'category': budget_category}))
+            if isinstance(MD.budget_table, pd.DataFrame):
+                bv = MD.budget_table.get_data_list()
+            else:
+                bv = list(MD.budget_table.find({'category': budget_category}))
             if len(bv) > 0:
                 budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
                 delete = {'float': 'right'}
@@ -132,7 +139,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
             else:
                 budget_value = None
 
-            transactions = pd.DataFrame(transactions_table.find({
+            transactions = pd.DataFrame(MD.transactions_table.find({
                 'date': {'$gte': datetime.today() - timedelta(days=180),
                          '$lte': datetime.today()},
                 'category': budget_category}))
@@ -144,10 +151,14 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         is_open = True
         categories = get_categories_list()
 
+    elif trigger == 'budget-value-input.value':
+        is_open = True
+        categories = get_categories_list()
+
     elif trigger == 'modal-submit.n_clicks':
-        categories = list(transactions_table.find().distinct('category'))
+        categories = list(MD.transactions_table.find().distinct('category'))
         if budget_category is not None and budget_value is not None:
-            MT.add_budget_item(budget_category, budget_value)
+            MD.add_budget_item(budget_category, budget_value)
             update_tab = True
             budget_category = None
             budget_value = None
@@ -161,7 +172,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
             is_open = True
 
     elif trigger == 'modal-delete.n_clicks':
-        MT.rm_budget_item(budget_category, budget_value)
+        MD.rm_budget_item(budget_category, budget_value)
         update_tab = True
         budget_category = None
         budget_value = None

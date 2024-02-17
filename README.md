@@ -2,11 +2,16 @@
 
 _A quick visualizer to monitor your personal finances._
 
-Process your bank transactions in a locally-hosted database to get an overview of your spending, categorize transactions, and define budget areas.
+Process your bank transactions in a locally-hosted database or set of CSV files to get an overview of your spending, categorize transactions, and define budget areas.
 
 ![app screenshot](/src/assets/screenshot.PNG)
 
 ## Usage
+There are two ways to store data for Budgie: a Mongo database or a set of CSV files.
+
+Note: I've not tested the limit of how large the CSV file can be, so you may experience slower performance if you have a large number of transactions (i.e. 10s of thousands of transactions).
+
+### Mongo Database
 Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
     
     MONGO_HOST=mongodb://X.X.X.X:X/
@@ -29,6 +34,14 @@ After the transactions are loaded, the parameters can be updated either individu
 The new transactions will attempt to be auto-categorized based on previous transactions with a similar description. 
 
 Once you categorize the transactions, you can add a budget and see your current status for different categories in the Budget tab.
+
+### CSV File
+Create a new folder to hold your CSV data, and store the path in a `.env` file in the top level of this repository following the template.
+    
+    DATA_DIR=C:\path\to\data\directory
+
+When you add new transactions or update your budget, Budgie will automatically rewrite the CSV with the new data. 
+Alternatively, you can click the "Save" button in the header to manually export your data.
 
 ### Special note about Venmo
 Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 

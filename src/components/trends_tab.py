@@ -2,7 +2,7 @@ from dash import dcc, html
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils import zero_params_dict, update_layout_axes, get_mongo_transactions, EXCLUDE_FROM_BUDGET
+from utils import zero_params_dict, MD, update_layout_axes, EXCLUDE_FROM_BUDGET
 
 
 def make_trends_plot(conf_dict):
@@ -39,7 +39,7 @@ def make_trends_plot(conf_dict):
         return l_v
 
     # Get transactions
-    transactions = get_mongo_transactions(conf_dict)
+    transactions = MD.query_transactions(conf_dict)
     transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
 
     # Make bar plot
