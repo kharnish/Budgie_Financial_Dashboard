@@ -7,7 +7,7 @@ from trends_tab import trends_tab, make_trends_plot
 from transaction_tab import transaction_tab, make_table
 from budget_tab import budget_tab, make_budget_plot
 from net_worth_tab import net_worth_tab, make_net_worth_plot
-from accounts_tab import accounts_tab, make_accounts_table
+from configurations_tab import configurations_tab, make_accounts_table
 from utils import zero_params_dict
 
 external_stylesheets = ['assets/budgie_light.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
@@ -41,7 +41,7 @@ app.layout = html.Div(
                     transaction_tab,
                     budget_tab,
                     net_worth_tab,
-                    accounts_tab,
+                    configurations_tab,
                 ]),
             ]),
     ]
@@ -79,21 +79,25 @@ def update_tab_data(current_params, which_tab, update_tab):
         acc_dict = make_accounts_table(zero_params_dict())
         return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns']
+
     elif which_tab == 'Transactions':
         tab_dict = make_table(current_params)
         acc_dict = make_accounts_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns']
+
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns']
+
     elif which_tab == 'Net Worth':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(zero_params_dict())
         return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(current_params), \
             acc_dict['data'], acc_dict['columns']
+
     elif which_tab == 'Accounts':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(current_params)

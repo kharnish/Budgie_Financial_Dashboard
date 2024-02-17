@@ -89,6 +89,7 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                  style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                                           html.Div(style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
                                                    children=[html.Button(children=["Add Manual Transaction ", html.I(className="fa-solid fa-plus")], id="manual-button")]),
+
                                           dbc.Modal(id="transaction-modal", is_open=False, children=[
                                               dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                                               dbc.ModalBody(children=[

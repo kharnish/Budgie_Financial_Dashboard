@@ -7,6 +7,11 @@ import os
 import pandas as pd
 import pymongo
 
+TRANSACTIONS_CLIENT = 'transactions_3'
+BUDGET_CLIENT = 'budget'
+ACCOUNTS_CLIENT = 'accounts'
+CATEGORIES_CLIENT = 'categories'
+
 
 class MaintainDatabase:
     def __init__(self):
@@ -22,19 +27,19 @@ class MaintainDatabase:
         load_dotenv()
         client_mongo = pymongo.MongoClient(os.getenv("MONGO_HOST"))
         client = client_mongo[os.getenv("MONGO_DB")]
-        self.transactions_table = client[os.getenv("TRANSACTIONS_CLIENT")]
-        self.budget_table = client[os.getenv("BUDGET_CLIENT")]
-        self.accounts_table = client[os.getenv("ACCOUNTS_CLIENT")]
+        self.transactions_table = client[TRANSACTIONS_CLIENT]
+        self.budget_table = client[BUDGET_CLIENT]
+        self.accounts_table = client[ACCOUNTS_CLIENT]
+        self.categories_table = client[CATEGORIES_CLIENT]
 
     def add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
-
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
             df = sheet
 
-            # Extra check if it's a venmo CSV
+        # Extra check if it's a venmo CSV
         if df.columns[1] == 'Unnamed: 1':
             if isinstance(sheet, str):
                 df = pd.read_csv(sheet, header=2)
@@ -51,7 +56,7 @@ class MaintainDatabase:
             df['date'] = [val.split('T')[0] for val in df['date']]
             df['notes'] = 'Source: ' + df['Funding Source'].replace({'Venmo balance': ''})
 
-            # Standardize sheet columns
+        # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
         if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
@@ -274,12 +279,46 @@ class MaintainDatabase:
         """Add new account in database with current status and beginning balance for net worth"""
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
-    def export_data_to_csv(self, root_dir=''):
-        """Dave database data to csv files"""
+    def delete_account(self, row_data):
+        """Delete account in database"""
+        return self.accounts_table.delete_one(row_data)
+
+    def add_category(self, category_name, category_parent=None):
+        """Add new category in database ... """
+        return self.categories_table.insert_one({'parent': category_parent, 'category name': category_name})
+
+    def edit_category(self, change_dict):
+        """Update category data based on edits in Categories table"""
+        new_dict = change_dict[0]['data']
+        old_dict = change_dict[0]['data'].copy()
+        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        return self.categories_table.update_one(old_dict, {'$set': new_dict})
+
+    def delete_category(self, row_data):
+        """Delete category in database"""
+        for row in row_data:
+            if row['parent'] == '':
+                row['parent'] = None
+            return self.categories_table.delete_one(row)
+
+    def export_database_to_csv(self):
+        """Save database data to csv files"""
         for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
-            this_data.to_csv(os.path.join(root_dir, coll.name + '.csv'), index=False, date_format='%Y-%m-%d')
+            try:
+                this_data = this_data.drop(columns=['_id'])
+            except KeyError:
+                pass
+            this_data.to_csv(coll.name + '.csv', index=False)
+
+    def import_data_from_csv(self):
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+            for file_name in os.listdir():
+                if file_name.endswith('.csv'):
+                    if file_name[:-4] == coll.name:
+                        df = pd.read_csv(file_name)
+                        coll.insert_many(df.to_dict('records'))
 
 
 if __name__ == '__main__':
