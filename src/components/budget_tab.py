@@ -129,11 +129,14 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value']:
         if budget_category is not None:
             if isinstance(MD.budget_table, pd.DataFrame):
-                bv = MD.budget_table.get_data_list()
+                bv = MD.budget_table.find({'category': budget_category})
             else:
                 bv = list(MD.budget_table.find({'category': budget_category}))
             if len(bv) > 0:
-                budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
+                try:
+                    budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
+                except KeyError:
+                    budget_value = budget_value if trigger == 'budget-value-input.value' else bv.iloc[0]['value']
                 delete = {'float': 'right'}
                 avg_style = {'padding': '0 0 25px 0'}
             else:

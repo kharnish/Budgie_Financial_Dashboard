@@ -20,7 +20,11 @@ def make_net_worth_plot(conf_dict):
     all_time_config = zero_params_dict()
     all_time_config['start_date'] = '2000-01-01'
     transactions = MD.query_transactions(all_time_config)
-    transactions = transactions.drop(transactions[(transactions['account name'] == 'Venmo') & (transactions.notes.str.contains('Source'))].index)
+
+    try:  # Drop Venmo transactions that are actually a transfer from another account
+        transactions = transactions.drop(transactions[(transactions['account name'] == 'Venmo') & (transactions.notes.str.contains('Source'))].index)
+    except AttributeError:
+        pass
 
     if len(transactions) == 0 or transactions.iloc[0].description == 'No Available Data':
         fig_obj = go.Figure()

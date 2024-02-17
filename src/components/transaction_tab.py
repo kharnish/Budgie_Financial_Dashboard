@@ -230,8 +230,12 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                 for key, val in update_dict.items():
                     r[key] = val
             MD.edit_many_transactions(row_data)
+
             if new_account:
                 MD.add_account(new_account)
+            if new_category:
+                MD.add_category(new_category)
+
             category = None
             new_category = None
             amount = None

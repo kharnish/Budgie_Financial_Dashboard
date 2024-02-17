@@ -1,12 +1,10 @@
-from bson.objectid import ObjectId
-from datetime import datetime, timedelta
-from difflib import get_close_matches
+from datetime import datetime
 from dotenv import load_dotenv
-import numpy as np
 import os
 import pandas as pd
+import uuid
 
-from maintain_transactions import MaintainDatabase
+from maintain_transactions import MaintainDatabase, EMPTY_TRANSACTION
 
 
 class BudgieDF(pd.DataFrame):
@@ -17,19 +15,28 @@ class BudgieDF(pd.DataFrame):
             value_filter (dict):
         """
         if value_filter is None:
-            return self  # .get_data_list()
+            return self
         else:
-            if len(value_filter) == 1:
-                return BudgieDF(self[self[list(value_filter.keys())[0]] == list(value_filter.values())[0]])
-            elif len(value_filter) == 2:
-                return BudgieDF(self[(self[list(value_filter.keys())[0]] == list(value_filter.values())[0]) & (self[list(value_filter.keys())[1]] == list(value_filter.values())[1])])
+            try:  # First check for date filter
+                dates = value_filter.pop('date')
+                self = self[(self['date'] >= dates['$gte']) & (self['date'] <= dates['$lte'])]
+            except KeyError:
+                pass
+
+            try:  # General catch all if the filter criteria doesn't exist in the columns
+                if len(value_filter) == 1:
+                    return BudgieDF(self[self[list(value_filter.keys())[0]] == list(value_filter.values())[0]])
+                elif len(value_filter) == 2:
+                    return BudgieDF(self[(self[list(value_filter.keys())[0]] == list(value_filter.values())[0]) & (self[list(value_filter.keys())[1]] == list(value_filter.values())[1])])
+            except KeyError:
+                return BudgieDF()
 
     def distinct(self, value):
-        vals_list = list(self[value].unique())
+        try:
+            vals_list = list(self[value].unique())
+        except KeyError:
+            vals_list = []
         return sorted(vals_list)
-
-    def get_data_list(self):
-        return [item[1] for item in self.iterrows()]
 
     def sort(self, by):
         if isinstance(by, dict):
@@ -50,16 +57,49 @@ class MaintainCSV(MaintainDatabase):
     def load_initial_data(self):
         load_dotenv()
         self.file_dir = os.getenv("DATA_DIR")
-        self.transactions_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'transactions.csv')))
-        self.transactions_table['date'] = pd.to_datetime(self.transactions_table['date'])
-        self.budget_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'budget.csv')))
-        self.accounts_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'accounts.csv')))
+
+        try:
+            self.transactions_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'transactions.csv')))
+            self.transactions_table['date'] = pd.to_datetime(self.transactions_table['date'])
+        except FileNotFoundError:
+            self.transactions_table = BudgieDF(EMPTY_TRANSACTION)
+
+        try:
+            self.budget_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'budget.csv')))
+        except FileNotFoundError:
+            self.budget_table = BudgieDF()
+
+        try:
+            self.accounts_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'accounts.csv')))
+        except FileNotFoundError:
+            self.accounts_table = BudgieDF()
+
+        try:
+            self.categories_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'categories.csv')))
+        except FileNotFoundError:
+            self.categories_table = BudgieDF()
+
+    def load_transactions(self, sheet, account=None):
+        """Import transaction CSV and save many transactions to dataframe"""
+        transaction_list = self._add_transactions(sheet, account)
+        for trans in transaction_list:
+            trans['_id'] = str(uuid.uuid4())
+
+        # Insert transactions into database
+        if len(transaction_list) > 0:
+            if len(self.transactions_table) == 1:  # don't let it include the EMPTY_TRANSACTIONS item in the actual data
+                self.transactions_table = BudgieDF(pd.DataFrame(transaction_list))
+            else:
+                self.transactions_table = BudgieDF(pd.concat([self.transactions_table, pd.DataFrame(transaction_list)]))
+        return len(transaction_list)
 
     def export_data_to_csv(self):
         """Save all data files to a CSV"""
-        self.transactions_table.to_csv(os.path.join(self.file_dir, 'transactions.csv'), index=False)
-        self.budget_table.to_csv(os.path.join(self.file_dir, 'budget.csv'), index=False)
-        self.accounts_table.to_csv(os.path.join(self.file_dir, 'accounts.csv'), index=False)
+        tables = [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]
+        file_names = ['transactions.csv', 'budget.csv', 'accounts.csv', 'categories.csv']
+        for i in range(4):
+            if len(tables[i]) > 0:
+                tables[i].to_csv(os.path.join(self.file_dir, file_names[i]), index=False)
 
     def add_one_transaction(self, category, amount, t_date, description, account, note):
         """Add a single manual transaction to the dataframe"""
@@ -67,7 +107,6 @@ class MaintainCSV(MaintainDatabase):
                        'category': [category],
                        'description': [description],
                        'amount': [amount],
-                       'currency': ['USD'],
                        'original description': [description],
                        'account name': [account],
                        'notes': [note]}
@@ -97,7 +136,7 @@ class MaintainCSV(MaintainDatabase):
             transactions = transactions[transactions[conf_dict['field_filter'].lower()].isin(conf_dict['filter_value'])]
 
         if len(transactions) == 0:
-            transactions = self.empty_transaction
+            transactions = EMPTY_TRANSACTION
 
         return transactions
 
@@ -133,11 +172,17 @@ class MaintainCSV(MaintainDatabase):
 
     def add_budget_item(self, category, value):
         """Add new budget item in dataframe with category and monthly value"""
-        existing = self.budget_table[self.budget_table['category'] == category]
+        try:  # Check for when there's no budget items yet
+            existing = self.budget_table[self.budget_table['category'] == category]
+        except KeyError:
+            existing = []
+
         if len(existing) == 1:
             self.budget_table.loc[existing.index, 'value'] = value
         else:
-            self.budget_table = BudgieDF(pd.concat([self.budget_table, pd.DataFrame({'category': [category], 'value': [value]})]))
+            self.budget_table = BudgieDF(pd.concat([self.budget_table, pd.DataFrame({'category': [category],
+                                                                                     'value': [value],
+                                                                                     '_id': uuid.uuid4()})], ignore_index=True))
 
     def rm_budget_item(self, category, value):
         """Delete budget item in dataframe"""
@@ -146,11 +191,28 @@ class MaintainCSV(MaintainDatabase):
 
     def add_account(self, account_name, status='open', initial_balance=0):
         """Add new account in dataframe with current status and beginning balance for net worth"""
-        self.accounts_table = BudgieDF(pd.concat([self.accounts_table, pd.DataFrame({'account name': [account_name], 'status': [status], 'initial balance': [initial_balance]})]))
+        self.accounts_table = BudgieDF(pd.concat([self.accounts_table, pd.DataFrame({'account name': [account_name],
+                                                                                     'status': [status],
+                                                                                     'initial balance': [initial_balance],
+                                                                                     '_id': uuid.uuid4()})], ignore_index=True))
 
-    def export_data_to_csv(self, root_dir=''):
-        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
-            coll.to_csv(coll.name + '.csv', index=False)
+    def delete_account(self, row_data):
+        """Delete account in database"""
+        rm_i = self.accounts_table[(self.accounts_table['_id'] == row_data['_id'])].index
+        self.accounts_table = BudgieDF(self.accounts_table.drop(rm_i))
+
+    def add_category(self, category_name, category_parent=None):
+        """Add new category in dataframe"""
+        self.categories_table = BudgieDF(pd.concat([self.categories_table, pd.DataFrame({'parent': [category_parent],
+                                                                                         'category name': [category_name],
+                                                                                         '_id': uuid.uuid4()})], ignore_index=True))
+
+    def delete_category(self, row_data):
+        """Delete category in database"""
+        for row in row_data:
+            if row['parent'] == '':
+                row['parent'] = None
+            return self.categories_table.delete_one(row)
 
 
 if __name__ == '__main__':
