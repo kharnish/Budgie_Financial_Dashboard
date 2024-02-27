@@ -23,6 +23,7 @@ class MaintainDatabase:
         self.accounts_table = None
         self.categories_table = None
         self.autocategories = None
+        self.file_dir = os.getcwd()
 
         self.load_initial_data()
 
@@ -66,7 +67,9 @@ class MaintainDatabase:
             df['amount'] = [''.join(val.split(' $')) for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
             df['date'] = [val.split('T')[0] for val in df['date']]
-            df['notes'] = 'Source: ' + df['Funding Source'].replace({'Venmo balance': ''})
+            source = df['Funding Source'].replace({'Venmo balance': np.nan})
+            if any(~source.isna()):
+                df['notes'] = 'Source: ' + source
 
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
@@ -155,7 +158,7 @@ class MaintainDatabase:
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             break
                         else:
-                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.3)
+                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
                             if matches:
                                 break
                             else:
@@ -243,11 +246,11 @@ class MaintainDatabase:
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
-        change_dict['data']['date'] = datetime.strptime(change_dict['data']['date'], '%m-%d-%Y')
-        new_dict = change_dict['data']
+        change_dict[0]['data']['date'] = datetime.strptime(change_dict[0]['data']['date'], '%m-%d-%Y')
+        new_dict = change_dict[0]['data']
         new_dict.pop('_id')
-        old_dict = change_dict['data'].copy()
-        old_dict[change_dict['colId']] = change_dict['oldValue']
+        old_dict = change_dict[0]['data'].copy()
+        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
         return self.transactions_table.update_one(old_dict, {'$set': new_dict})
 
     def edit_many_transactions(self, transaction_list):
@@ -305,19 +308,22 @@ class MaintainDatabase:
                 row['parent'] = None
             return self.categories_table.delete_one(row)
 
-    def export_data_to_csv(self):
-        """Save database data to csv files"""
-        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+    def export_data_to_csv(self, root=None):
+        """Save database data to CSV files"""
+        root = self.file_dir if root is None else root
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
             try:
-                this_data = this_data.drop(columns=['_id'])
+                this_data = this_data.drop(columns=['currency'])
             except KeyError:
                 pass
-            this_data.to_csv(coll.name + '.csv', index=False)
+            this_data.to_csv(os.path.join(root, coll.name + '.csv'), index=False)
+        return root
 
     def import_data_from_csv(self):
-        for coll in [self.transactions_table, self.budget_table, self.accounts_table]:
+        """Import CSV data into a new database"""
+        for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             for file_name in os.listdir():
                 if file_name.endswith('.csv'):
                     if file_name[:-4] == coll.name:
@@ -327,3 +333,4 @@ class MaintainDatabase:
 
 if __name__ == '__main__':
     md = MaintainDatabase()
+    md.export_data_to_csv()

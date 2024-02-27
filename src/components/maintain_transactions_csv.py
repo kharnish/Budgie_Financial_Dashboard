@@ -145,8 +145,8 @@ class MaintainCSV(MaintainDatabase):
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
-        change_dict['data']['date'] = datetime.strptime(change_dict['data']['date'], '%m-%d-%Y')
-        new_dict = change_dict['data']
+        change_dict[0]['data']['date'] = datetime.strptime(change_dict[0]['data']['date'], '%m-%d-%Y')
+        new_dict = change_dict[0]['data']
         tid = new_dict['_id']
         existing = self.transactions_table[self.transactions_table['_id'] == tid]
         for key, val in new_dict.items():
