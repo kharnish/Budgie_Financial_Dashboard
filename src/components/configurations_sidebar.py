@@ -5,10 +5,11 @@ import dash_bootstrap_components as dbc
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from io import StringIO
-
+import os
 import pandas as pd
 
 from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
+
 
 configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
                                   children=[
@@ -79,11 +80,11 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                    children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
                                                                           clearable=True, options=get_accounts_list('new'))],
                                                    ),
-                                          html.Div(style={'display': 'inline-block', 'width': '90%', 'padding': '10px 20px'},
+                                          html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
                                                    children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
                                                                        placeholder='New account name')], ),
                                           html.Div(style={'display': 'inline-block'},
-                                                   children=[dcc.Upload(id='upload-data', multiple=True,
+                                                   children=[dcc.Upload(id='upload-data', multiple=True, style={'display': 'inline-block', 'padding': '5px 20px 20px 12px'},
                                                                         children=[html.Button('Select Transaction CSV')])]),
                                           html.I(id='upload-message',
                                                  style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
@@ -94,7 +95,7 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                               dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                                               dbc.ModalBody(children=[
                                                   html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
-                                                           children=['Transaction Date *', html.Br(),
+                                                           children=['Transaction Date', html.Span(" *", style={"color": "red"}), html.Br(),
                                                                      dcc.DatePickerSingle(
                                                                          id='transaction-date',
                                                                          min_date_allowed=date(2000, 1, 1),
@@ -102,17 +103,17 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                                          initial_visible_month=date.today(),
                                                                      )]),
                                                   html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
-                                                           children=['Select Account *',
-                                                                     dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Required',
+                                                           children=['Select Account', html.Span(" *", style={"color": "red"}),
+                                                                     dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Select account...',
                                                                                   style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                                   options=get_accounts_list())]),
                                                   html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
-                                                           children=['Transaction Amount *', html.Br(),
+                                                           children=['Transaction Amount', html.Span(" *", style={"color": "red"}), html.Br(),
                                                                      dcc.Input(id='transaction-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
                                                   html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
-                                                           children=['Transaction Description *', html.Br(),
+                                                           children=['Transaction Description', html.Span(" *", style={"color": "red"}), html.Br(),
                                                                      dcc.Input(id='description-input', type='text', style={'display': 'inline-block', 'width': '100%'},
-                                                                               placeholder='Required')]),
+                                                                               placeholder='Description...')]),
                                                   html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
                                                            children=['Select Category',
                                                                      dcc.Dropdown(id='modal-category-dropdown', className='dropdown', clearable=True, placeholder='unknown',
@@ -135,13 +136,17 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                           # Overwrite the data files if it's being pulled from CSV
                                           html.Div(id='export-container', style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
                                                    children=[html.Button(children=["Export Data ", html.I(className="fa-solid fa-download")],
-                                                                         id="export-button")]),
-                                          html.I(id='export-message',
-                                                 style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
-
+                                                                         id="export-button"),
+                                                             html.Div(style={'display': 'inline-block', 'padding': '0 0 0 10px'},
+                                                                      children=[html.I(className="fa-solid fa-circle-info", id='help-icon-3', style={'display': 'inline-block'})]),
+                                                             ]),
+                                          dbc.Tooltip(id='export-tooltip',
+                                                      target='help-icon-3',
+                                                      placement='right',
+                                                      style={'font-size': 14}),
+                                          html.I(id='export-message', style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                                       ]),
                                   ])
-
 
 @callback(
     Output('current-config-memory', 'data'),
@@ -158,8 +163,9 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
     Input('date-range', 'end_date'),
     Input('pie-button', 'n_clicks'),
     Input('bar-button', 'n_clicks'),
+    Input('time-button', 'n_clicks'),
 )
-def update_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date, bar_button, pie_button):
+def update_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date, bar_button, pie_button, time_button):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
@@ -226,6 +232,8 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
         curr_params['plot_type'] = 'pie'
     elif trigger == 'bar-button.n_clicks':
         curr_params['plot_type'] = 'bar'
+    elif trigger == 'time-button.n_clicks':
+        curr_params['plot_type'] = 'time'
 
     if new_params['field_filter'] == 'Account Name':
         filter_dropdown = get_accounts_list()
@@ -314,9 +322,10 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
 
 @callback(
     Output('upload-message', 'children'),
-    Output('upload-data', 'style'),
+    Output('upload-data', 'disabled'),
     Output('account-input', 'style'),
     Output('account-dropdown', 'options'),
+    Output('account-dropdown', 'value'),
     Output('update-tab', 'data'),
 
     Input('account-dropdown', 'value'),
@@ -334,10 +343,9 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
     Returns: String with message about if the transactions were uploaded
 
     """
-    upload_button = {'display': 'none'}
+    upload_button = True
     msg = ''
     account_input = {'display': 'none'}
-    acc_list = get_accounts_list('new')
     update_tab = no_update
 
     trigger = dash.callback_context.triggered[0]['prop_id']
@@ -345,7 +353,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         if account == 'Add new account...':
             account_input = {'display': 'inline-block', 'width': '100%'}
         elif account is not None:
-            upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
+            upload_button = False
     elif trigger == 'upload-data.contents':
         if account == 'Add new account...':
             account = new_account
@@ -361,6 +369,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 continue
 
             results = MD.load_transactions(m, account)
+            account = None
             if new_account:
                 MD.add_account(new_account)
             if isinstance(results, int):
@@ -376,26 +385,27 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
     elif trigger == 'account-input.value':
         account_input = {'display': 'inline-block', 'width': '100%'}
-        upload_button = {'display': 'inline-block', 'padding': '0px 20px 20px 20px'}
+        upload_button = False
 
-    return msg, upload_button, account_input, acc_list, update_tab
+    return msg, upload_button, account_input, get_accounts_list('new'), account, update_tab
 
 
 @callback(
     Output('export-message', 'children'),
-    Output('export-container', 'style'),
+    Output('export-tooltip', 'children'),
     Input('export-button', 'n_clicks'),
 )
 def export_data(export):
     """If pulling data from CSV, export the files to the CSV where they're currently located"""
     msg = None
-    style = {'display': 'none'}
     if isinstance(MD.transactions_table, pd.DataFrame):
-        style = {'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'}
+        tooltip = f"Export data (transactions, budget, accounts, categories) as CSV files to overwrite current files in:  {os.getenv('DATA_DIR')}."
+    else:
+        tooltip = 'Export data (transactions, budget, accounts, categories) as CSV files.'
 
     trigger = dash.callback_context.triggered[0]['prop_id']
     if trigger == 'export-button.n_clicks':
         MD.export_data_to_csv()
         msg = f"Saved files to {MD.file_dir}"
 
-    return msg, style
+    return msg, tooltip
