@@ -1,8 +1,11 @@
 from dash import dcc, html
+from datetime import date, timedelta, datetime
+from dateutil.relativedelta import relativedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-from utils import zero_params_dict, MD, update_layout_axes, EXCLUDE_FROM_BUDGET
+import utils
+from utils import zero_params_dict, MD, update_layout_axes, get_categories_list, EXCLUDE_FROM_BUDGET
 
 
 def make_trends_plot(conf_dict):
@@ -46,10 +49,23 @@ def make_trends_plot(conf_dict):
     if conf_dict['plot_type'] == 'bar':
         fig_obj = go.Figure()
         lab_val = _sort_plot_data()
+        trace_count = 0
+        trace_dict = {}
         for in_sp in ['Spending', 'Income']:
             for i in range(len(lab_val[in_sp]['values'])):
-                fig_obj.add_trace(go.Bar(y=[in_sp], x=[lab_val[in_sp]['values'][i]], name=lab_val[in_sp]['labels'][i], orientation='h',
-                                         meta=lab_val[in_sp]['labels'][i],
+                show_trace = True  # If category has both spending and income, hide the second trace so it only shows up once in the legend
+                name = lab_val[in_sp]['labels'][i]
+                trace_color = trace_dict.get(name)
+                if trace_color is None:
+                    trace_color = trace_count
+                    trace_dict[name] = trace_count
+                    trace_count += 1
+                else:
+                    show_trace = False
+
+                fig_obj.add_trace(go.Bar(y=[in_sp], x=[lab_val[in_sp]['values'][i]], name=name, legendgroup=name,
+                                         marker_color=utils.get_color(trace_color), showlegend=show_trace,
+                                         orientation='h', meta=lab_val[in_sp]['labels'][i],
                                          hovertemplate="%{meta}<br>$%{x:.2f}<extra></extra>"))
         fig_obj.update_yaxes(title_text="Expenditures")
 
@@ -61,10 +77,53 @@ def make_trends_plot(conf_dict):
         fig_obj = make_subplots(rows=1, cols=2, subplot_titles=['Income', 'Spending'], specs=[[{'type': 'domain'}, {'type': 'domain'}]])
         lab_val = _sort_plot_data()
         # TODO try and figure out a better hover label for the plots
-        fig_obj.add_trace(go.Pie(labels=lab_val['Income']['labels'], values=lab_val['Income']['values'], textinfo='percent+label',
-                                 meta=lab_val['Income']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 1)
-        fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'], textinfo='percent+label',
-                                 meta=lab_val['Spending']['values'], hovertemplate="$%{meta:.2f}<extra></extra>"), 1, 2)
+        fig_obj.add_trace(go.Pie(labels=lab_val['Income']['labels'], values=lab_val['Income']['values'],
+                                 meta=lab_val['Income']['values'], hovertemplate="%{label}<br>$%{meta:.2f}<extra></extra>"), 1, 1)
+        fig_obj.add_trace(go.Pie(labels=lab_val['Spending']['labels'], values=lab_val['Spending']['values'],
+                                 meta=lab_val['Spending']['values'], hovertemplate="%{label}<br>$%{meta:.2f}<extra></extra>"), 1, 2)
+
+    # Or plot over time
+    elif conf_dict['plot_type'] == 'time':
+        fig_obj = go.Figure()
+
+        # Get each date to query data, filtering by day/week/month based on overall length of time window
+        start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
+        end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+        display_delta = end_date - start_date
+        days = [end_date]
+        if display_delta < timedelta(days=32):
+            iter_delta = relativedelta(weeks=1)
+        elif display_delta < timedelta(days=365):
+            iter_delta = relativedelta(months=1)
+        else:
+            iter_delta = relativedelta(years=1)
+        while True:
+            previous_date = date(days[-1].year, days[-1].month, days[-1].day) - iter_delta
+            days.append(previous_date)
+            if previous_date <= start_date:
+                break
+
+        # Calculate spending at each date
+        val_dict = {}
+        for i in range(len(days) - 1):
+            this_month = transactions[(transactions['date'].dt.date < days[i]) & (transactions['date'].dt.date >= days[i + 1])]
+            for cat, grp in this_month.groupby('category'):
+                try:
+                    val_dict[cat]['date'].append(days[i+1])
+                    val_dict[cat]['amount'].append(grp['amount'].sum())
+                except KeyError:
+                    val_dict[cat] = {'date': [days[i+1]], 'amount': [grp['amount'].sum()]}
+
+        # Alphabetize list of categories
+        val_dict = dict(sorted(val_dict.items()))
+
+        for key, val in val_dict.items():
+            fig_obj.add_trace(go.Bar(x=val['date'], y=val['amount'], name=key, legendgroup=key,
+                                     meta=key, hovertemplate="%{meta}<br>$%{y:.2f}<extra></extra>"))
+
+        fig_obj.update_xaxes(title_text="Date")
+        fig_obj.update_yaxes(title_text="Amount ($)")
+        fig_obj.update_layout(barmode='relative')
 
     # Standard figure layout
     update_layout_axes(fig_obj)
@@ -75,10 +134,13 @@ trends_tab = dcc.Tab(label="Trends", value='Trends', children=[
                         html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
                                  children=[
                                      html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
+                                              children=[html.Button(style={'width': '120px', 'padding': '0'},
+                                                                    children=["Over Time ", html.I(className="fa-solid fa-arrow-trend-up")], id="time-button")]),
+                                     html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
                                               children=[html.Button(style={'width': '75px', 'padding': '0'},
                                                                     children=["Pie ", html.I(className="fas fa-chart-pie")], id="pie-button")]),
                                      html.Div(style={'padding': '10px 5px', 'display': 'inline-block', 'float': 'right'},
-                                              children=[html.Button(style={'width': '75px', 'padding': '0'},
+                                              children=[html.Button(style={'width': '85px', 'padding': '0'},
                                                                     children=["Bar ", html.I(className="fa-solid fa-chart-column")], id="bar-button")]),
                                      html.Div(id="trends-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
                                               children=[dcc.Graph(id='trends-graph', style={'height': '600px'}, figure=make_trends_plot(zero_params_dict()))]),

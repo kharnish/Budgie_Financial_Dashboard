@@ -25,18 +25,31 @@ def make_budget_plot(conf_dict):
         for item in MD.budget_table.find():
             budget_dict[item['category']] = item['value']
 
+    # Alphabetize list of categories
+    budget_dict = dict(sorted(budget_dict.items(), reverse=True))
+
     # TODO Limit the budget plot to only show one month
     #  Or make it show month-to-month for each category
     transactions = MD.query_transactions(conf_dict)
 
+    percent_list = []
     fig_obj = go.Figure()
     for cat in budget_dict.keys():
         spent = float(transactions[transactions['category'] == cat]['amount'].sum())
         percent = -100 * spent / budget_dict[cat]
-        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=[f"$ {-spent:.2f}"], textposition="outside",
-                                 meta=[f"$ {budget_dict[cat]:.2f}"],
-                                 hovertemplate="Spent:       %{text}<br>Budgeted: %{meta}<extra></extra>"))
+        percent_list.append(percent)
+        diff = budget_dict[cat] - abs(spent)
+        if diff > 0:
+            m = f"Remaining: $ {diff:.2f}"
+        else:
+            m = f"Over: $ {-diff:.2f}"
+        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
+                                 meta=[f"$ {budget_dict[cat]:.2f}", f"$ {-spent:.2f}"],
+                                 hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
+
+    max_x = max(percent_list)
+    fig_obj.update_layout(xaxis_range=[0, max_x * 1.1])
 
     fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
 

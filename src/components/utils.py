@@ -8,6 +8,23 @@ from maintain_transactions_csv import MaintainCSV
 EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
 EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
 
+PLOTLY_COLORS = [
+    '#636EFA',
+    '#EF553B',
+    '#00CC96',
+    '#AB63FA',
+    '#FFA15A',
+    '#19D3F3',
+    '#FF6692',
+    '#B6E880',
+    '#FF97FF',
+    '#FECB52',
+]
+
+# PLOTLY_COLORS = ['royalblue', 'crimson', 'mediumseagreen', 'mediumpurple', 'darkorange', 'turquoise',
+#           'deeppink', 'gold', 'lawngreen', 'sienna']
+
+
 COLORS = {
     'light': {
         'gridgray': '#646464',
@@ -47,7 +64,7 @@ def zero_params_dict():
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
 
-def update_layout_axes(fig_obj):
+def update_layout_axes(fig_obj, showlegend=True):
     fig_obj.update_xaxes(showline=True, mirror=True, linewidth=1, linecolor=COLORS['light'].get('gridgray'),
                          zeroline=True, zerolinewidth=1, zerolinecolor=COLORS['light'].get('gridgray'),
                          showgrid=True, gridwidth=1, gridcolor=COLORS['light'].get('gridgray'))
@@ -56,6 +73,7 @@ def update_layout_axes(fig_obj):
                          showgrid=True, gridwidth=1, gridcolor=COLORS['light'].get('gridgray'))
     fig_obj.update_layout(
         font=dict(family='Arial', size=15),
+        showlegend=showlegend,
         plot_bgcolor=COLORS['light'].get('background'),
         paper_bgcolor=COLORS['light'].get('background'),
         font_color=COLORS['light'].get('text'),
@@ -94,3 +112,8 @@ def get_categories_list(extra=''):
     else:
         cat_list.extend(MD.transactions_table.find().distinct('category'))
     return cat_list
+
+
+def get_color(i):
+    """Get color for plotting from list of colors"""
+    return PLOTLY_COLORS[i % len(PLOTLY_COLORS)]
