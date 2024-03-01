@@ -2,14 +2,65 @@
 
 _A quick visualizer to monitor your personal finances._
 
-Process your bank transactions in a locally-hosted database or set of CSV files to get an overview of your spending, categorize transactions, and define budget areas.
+Process your bank transactions to get an overview of your spending, categorize transactions, and define budget areas.
 
 ![app screenshot](/src/assets/screenshot.PNG)
 
-## Getting Started
-There are two ways to store data for Budgie: a Mongo database or a set of CSV files.
 
-Note: I've not tested the limit of how large the CSV file can be, so you may experience slower performance if you have a large number of transactions (i.e. tens of thousands of transactions).
+# Getting Started
+There are two ways to use Budgie:
+1. Download the executable file to run from your command line
+2. Clone the source code and run in your local Python environment
+
+There are also two ways to store your financial data:
+1. A set of CSV files
+2. A Mongo database
+
+Add a new account by selecting the "Add New Account..." option from the accounts drop down menu.
+Type your account name and instantiate that account by selecting a transaction CSV file from your bank to upload. 
+Once the account is logged in your database, you can upload more transactions CSV files under that account. 
+You can select multiple files to upload simultaneously for the same account.
+
+You can also manually input transactions with the "Add Mantual Transaction" menu.
+
+To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
+in the CSV file and simply leave the "New account name" input empty when uploading the file.
+
+After the transactions are loaded, you can update their details in the "Transactions" tab either by double clicking on the data or by selecting one or multiple rows
+and updating with the "Edit" button.
+
+New transactions will attempt to be auto-categorized based on previous transactions with a similar description. 
+
+Once you categorize the transactions, you can add a budget and see your current status for different categories in the "Budget" tab
+and use the filters on the Configurations sidebar to look for trends in your finances.
+
+
+
+## Running Budgie
+
+### Use the Executable
+Simply download the `Budgie.exe` file to your computer. When you launch it, it will open a command window with logging information.
+
+Open your preferred web browser and go to http://127.0.0.1:8050/ to access the app. 
+
+
+### Clone the Source Code
+
+Clone the repository to your computer. Make a python environment and install the required libraries.
+
+Start the Dash app with `python app()` and then access the app at http://127.0.0.1:8050/.
+
+## Storing Data
+### CSV File
+If you are using the executable version of the program, a new folder called `data` to store the files will be created in the same location as the executable.
+
+Alternatively, you can specify a path with an `.env` file in the same location as the executable or at the top level of the repository that simply contains:
+    
+    DATA_DIR=C:\path\to\data\directory
+
+When you add new transactions or update your budget, Budgie will automatically rewrite the CSV with the new data. 
+You can also click the "Export Data" button on bottom left to manually export your data.
+
 
 ### Mongo Database
 Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
@@ -19,27 +70,8 @@ Instantiate a Mongo database and store the information in a `.env` file in the t
 
 Start the Dash app with `python app()` and then access the app at http://127.0.0.1:8050/.
 
-Add a new account by selecting the "Add New Account..." option from the accounts drop down menu.
-Type your desired account name and instantiate that account by selecting a transaction CSV file from your bank to upload. 
-Once the account is logged in your database, you can upload more transactions CSV files under that account. 
-You can select multiple files to upload simultaneously for the same account.
+You can export the database data as CSV files by clicking the "Export Data" button on bottom left to manually export your data to the root directory of the repository.
 
-To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
-in the CSV file and simply leave the "New account name" input empty when uploading the file.
-
-After the transactions are loaded, the parameters can be updated either individually or multiple at one time.
-
-The new transactions will attempt to be auto-categorized based on previous transactions with a similar description. 
-
-Once you categorize the transactions, you can add a budget and see your current status for different categories in the Budget tab.
-
-### CSV File
-Create a new folder to hold your CSV data, and store the path in a `.env` file in the top level of this repository following the template.
-    
-    DATA_DIR=C:\path\to\data\directory
-
-When you add new transactions or update your budget, Budgie will automatically rewrite the CSV with the new data. 
-Alternatively, you can click the "Save" button in the header to manually export your data.
 
 
 ## Getting Started with Python and MongoDB
@@ -90,3 +122,6 @@ If your bank's CSV fails to be uploaded, make an issue that includes the header 
 Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 
 transaction notes as "Source: [source information]" in order to properly calculate your net worth. 
 
+### Slow performance
+I've only run the CSV file option with a couple thousand transactions (for me, a handful of years of transactions). Substantially larger amounts of data may experience slower performance,
+and if so, please make an issue for it so I can address that.

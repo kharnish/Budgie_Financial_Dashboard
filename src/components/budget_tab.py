@@ -48,7 +48,7 @@ def make_budget_plot(conf_dict):
                                  hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
 
-    max_x = max(percent_list)
+    max_x = max(percent_list) if percent_list else 0
     fig_obj.update_layout(xaxis_range=[0, max_x * 1.1])
 
     fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
