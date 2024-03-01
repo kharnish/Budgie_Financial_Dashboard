@@ -106,7 +106,8 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                            children=['Select Account', html.Span(" *", style={"color": "red"}),
                                                                      dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Select account...',
                                                                                   style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
-                                                                                  options=get_accounts_list())]),
+                                                                                  options=get_accounts_list('new'))]),
+                                                  html.Div([dcc.Input(id='modal-account-input', type='text', style={'display': 'inline-block'}, placeholder='New account...')]),
                                                   html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
                                                            children=['Transaction Amount', html.Span(" *", style={"color": "red"}), html.Br(),
                                                                      dcc.Input(id='transaction-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
@@ -119,7 +120,7 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                                                      dcc.Dropdown(id='modal-category-dropdown', className='dropdown', clearable=True, placeholder='unknown',
                                                                                   style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                                                   )]),
-                                                  html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category')]),
+                                                  html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category...')]),
                                                   html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
                                                            children=['Transaction Note', html.Br(),
                                                                      dcc.Input(id='note-input', type='text', style={'display': 'inline-block', 'width': '100%'},
@@ -253,7 +254,11 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     Output('transaction-date', 'date'),
     Output('description-input', 'value'),
     Output('modal-account-dropdown', 'value'),
+    Output('modal-account-input', 'value'),
+    Output('modal-account-input', 'style'),
+    Output('modal-account-dropdown', 'options'),
     Output('modal-transaction-text', 'children'),
+    Output('modal-category-input', 'value'),
     Output('modal-category-input', 'style'),
     Output('modal-category-dropdown', 'options'),
     Output('note-input', 'value'),
@@ -267,11 +272,12 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     Input('transaction-date', 'date'),
     Input('description-input', 'value'),
     Input('modal-account-dropdown', 'value'),
+    Input('modal-account-input', 'value'),
     Input('modal-category-input', 'value'),
     Input('note-input', 'value'),
     prevent_initial_call=True,
 )
-def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_category, note):
+def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_account, new_category, note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     update_tab = no_update
@@ -281,9 +287,14 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
     t_date = date.today() if t_date is None else t_date
 
     if category == 'Add new category...':
-        cat_input = {'display': 'inline-block'}
+        cat_style = {'display': 'inline-block', 'width': '400px'}
     else:
-        cat_input = {'display': 'none'}
+        cat_style = {'display': 'none'}
+
+    if account == 'Add new account...':
+        acc_style = {'display': 'inline-block', 'width': '400px'}
+    else:
+        acc_style = {'display': 'none'}
 
     if trigger == 'manual-button.n_clicks':
         is_open = True
@@ -295,29 +306,44 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     category = new_category
+
+            if account == 'Add new account...':
+                if new_account == '':
+                    is_open = True
+                    msg_str = dbc.Alert("You must specify an account.", color="danger")
+                else:
+                    account = new_account
             MD.add_one_transaction(category, amount, t_date, description, account, note)
+            if new_account:
+                MD.add_account(new_account)
+            if new_category:
+                MD.add_category(new_category)
             category = 'unknown'
+            new_category = None
             amount = '$ 0'
             t_date = date.today()
             description = None
             account = None
+            new_account = None
             note = None
             update_tab = True
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify all values.", color="danger")
     elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'description-input.value',
-                     'modal-account-dropdown.value', 'modal-category-input.value', 'note-input.value']:
+                     'modal-account-dropdown.value', 'modal-account-input.value', 'modal-category-input.value', 'note-input.value']:
         is_open = True
     else:
         category = 'unknown'
+        new_category = None
         amount = '$ 0'
         t_date = date.today()
         description = None
         account = None
+        new_account = None
         note = None
 
-    return is_open, category, amount, t_date, description, account, msg_str, cat_input, get_categories_list('new'), note, update_tab
+    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, get_categories_list('new'), note, update_tab
 
 
 @callback(

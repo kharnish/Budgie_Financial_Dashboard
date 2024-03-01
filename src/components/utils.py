@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from dotenv import load_dotenv
 import os
+import sys
 
 from maintain_transactions import MaintainDatabase
 from maintain_transactions_csv import MaintainCSV
@@ -20,9 +21,6 @@ PLOTLY_COLORS = [
     '#FF97FF',
     '#FECB52',
 ]
-
-# PLOTLY_COLORS = ['royalblue', 'crimson', 'mediumseagreen', 'mediumpurple', 'darkorange', 'turquoise',
-#           'deeppink', 'gold', 'lawngreen', 'sienna']
 
 
 COLORS = {
@@ -47,6 +45,9 @@ if os.getenv("MONGO_HOST") is not None:
 elif os.getenv("DATA_DIR") is not None:
     MD = MaintainCSV()
     print(f"Using CSV data from {os.getenv('DATA_DIR')}")
+elif getattr(sys, 'frozen', False):
+    MD = MaintainCSV()
+    print(f"Using CSV data from default directory: {os.getcwd()}")
 else:
     print("You must specify either MONGO_HOST or DATA_DIR in the .env file")
     quit()
