@@ -101,7 +101,7 @@ class MaintainCSV(MaintainDatabase):
             if len(self.transactions_table) == 1:  # don't let it include the EMPTY_TRANSACTIONS item in the actual data
                 self.transactions_table = BudgieDF(pd.DataFrame(transaction_list))
             else:
-                self.transactions_table = BudgieDF(pd.concat([self.transactions_table, pd.DataFrame(transaction_list)]).reindex())
+                self.transactions_table = BudgieDF(pd.concat([self.transactions_table, pd.DataFrame(transaction_list)]).reset_index(drop=True))
         self.export_data_to_csv()
         return len(transaction_list)
 
@@ -128,7 +128,7 @@ class MaintainCSV(MaintainDatabase):
         if len(self.transactions_table) == 1 and self.transactions_table.loc[0]['description'] == 'No Available Data':  # don't let it include the EMPTY_TRANSACTIONS item in the actual data
             self.transactions_table = BudgieDF(pd.DataFrame(transaction))
         else:
-            self.transactions_table = BudgieDF(pd.concat([self.transactions_table, pd.DataFrame(transaction)]).reindex())
+            self.transactions_table = BudgieDF(pd.concat([self.transactions_table, pd.DataFrame(transaction)]).reset_index(drop=True))
         self.export_data_to_csv()
 
     def _get_categories(self, account):

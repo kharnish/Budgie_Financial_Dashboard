@@ -254,9 +254,11 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     Output('transaction-date', 'date'),
     Output('description-input', 'value'),
     Output('modal-account-dropdown', 'value'),
+    Output('modal-account-input', 'value'),
     Output('modal-account-input', 'style'),
     Output('modal-account-dropdown', 'options'),
     Output('modal-transaction-text', 'children'),
+    Output('modal-category-input', 'value'),
     Output('modal-category-input', 'style'),
     Output('modal-category-dropdown', 'options'),
     Output('note-input', 'value'),
@@ -317,10 +319,12 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
             if new_category:
                 MD.add_category(new_category)
             category = 'unknown'
+            new_category = None
             amount = '$ 0'
             t_date = date.today()
             description = None
             account = None
+            new_account = None
             note = None
             update_tab = True
         else:
@@ -331,13 +335,15 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
         is_open = True
     else:
         category = 'unknown'
+        new_category = None
         amount = '$ 0'
         t_date = date.today()
         description = None
         account = None
+        new_account = None
         note = None
 
-    return is_open, category, amount, t_date, description, account, acc_style, get_accounts_list('new'), msg_str, cat_style, get_categories_list('new'), note, update_tab
+    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, get_categories_list('new'), note, update_tab
 
 
 @callback(
