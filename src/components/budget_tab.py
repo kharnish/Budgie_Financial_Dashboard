@@ -2,6 +2,7 @@ import dash
 from dash import Dash, callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -32,35 +33,40 @@ def make_budget_plot(conf_dict):
     #  Or make it show month-to-month for each category
     transactions = MD.query_transactions(conf_dict)
 
-    percent_list = []
     fig_obj = go.Figure()
+
+    # Calculate overall percent of budget for multiple months
+    start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
+    end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+    display_delta = end_date - start_date
+    months = np.ceil(display_delta.days / 31)
+
+    percent_list = []
     for cat in budget_dict.keys():
         spent = float(transactions[transactions['category'] == cat]['amount'].sum())
-        percent = -100 * spent / budget_dict[cat]
+        budgeted = budget_dict[cat] * months
+        percent = -100 * spent / budgeted
         percent_list.append(percent)
-        diff = budget_dict[cat] - abs(spent)
+        diff = budgeted - abs(spent)
         if diff > 0:
             m = f"Remaining: $ {diff:.2f}"
         else:
             m = f"Over: $ {-diff:.2f}"
         fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
-                                 meta=[f"$ {budget_dict[cat]:.2f}", f"$ {-spent:.2f}"],
+                                 meta=[f"$ {budgeted:.2f}", f"$ {-spent:.2f}"],
                                  hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
 
     max_x = max(percent_list) if percent_list else 0
     fig_obj.update_layout(xaxis_range=[0, max_x * 1.1])
 
-    fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
-
-    # Make a vertical line to show progress through the month
-    start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
-    end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+    # Make a vertical line to limit and progress through the month
     today = date.today()
     if start_date <= today <= end_date:
-        progress = (today - date(today.year, today.month, 1)).days
-        progress = 100 * progress / 31
+        progress = (today - start_date).days
+        progress = 100 * progress / (31 * months)
         fig_obj.add_vline(x=progress, line_width=1, line_color=COLORS['light'].get('gridgray'))
+    fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
 
     # Standard figure layout, but don't show horizontal lines
     update_layout_axes(fig_obj)

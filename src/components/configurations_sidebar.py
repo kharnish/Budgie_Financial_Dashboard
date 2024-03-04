@@ -149,6 +149,7 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                       ]),
                                   ])
 
+
 @callback(
     Output('current-config-memory', 'data'),
     Output('field-dropdown', 'value'),
@@ -318,6 +319,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                 MD.add_account(new_account)
             if new_category:
                 MD.add_category(new_category)
+            MD.export_data_to_csv()
             category = 'unknown'
             new_category = None
             amount = '$ 0'
@@ -394,21 +396,28 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            results = MD.load_transactions(m, account)
-            account = None
-            if new_account:
-                MD.add_account(new_account)
-            if isinstance(results, int):
-                if results == 0:
-                    msg.append(f"File {i + 1}: No new transactions to upload")
-                    msg.append(html.Br())
+            try:
+                results = MD.load_transactions(m, account)
+                account = None
+                if new_account:
+                    MD.add_account(new_account)
+                    MD.export_data_to_csv()
+                if isinstance(results, int):
+                    if results == 0:
+                        msg.append(f"File {i + 1}: No new transactions to upload")
+                        msg.append(html.Br())
+                    else:
+                        msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
+                        msg.append(html.Br())
+                        update_tab = True
                 else:
-                    msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
+                    msg.append(f"File {i + 1}: {results}\n")
                     msg.append(html.Br())
-                    update_tab = True
-            else:
-                msg.append(f"File {i + 1}: {results}\n")
+
+            except Exception as e:
+                msg.append(f"File {i + 1} Error: Could not parse transactions")
                 msg.append(html.Br())
+
     elif trigger == 'account-input.value':
         account_input = {'display': 'inline-block', 'width': '100%'}
         upload_button = False

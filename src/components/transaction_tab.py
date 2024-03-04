@@ -235,6 +235,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                 MD.add_account(new_account)
             if new_category:
                 MD.add_category(new_category)
+            MD.export_data_to_csv()
 
             category = None
             new_category = None

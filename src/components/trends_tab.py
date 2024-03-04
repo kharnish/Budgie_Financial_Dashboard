@@ -8,11 +8,12 @@ import utils
 from utils import zero_params_dict, MD, update_layout_axes, get_categories_list, EXCLUDE_FROM_BUDGET
 
 
-def make_trends_plot(conf_dict):
+def make_trends_plot(conf_dict, initial=False):
     """Make plot object from transactions broken into income and spending.
 
     Args:
         conf_dict: Dictionary of the configuration parameters
+        initial: If it's running the initial setup, used for determining the initial data display
 
     Returns: Plotly figure object
 
@@ -43,10 +44,27 @@ def make_trends_plot(conf_dict):
 
     # Get transactions
     transactions = MD.query_transactions(conf_dict)
+
+    # Check if any transaction data, and if not, annotate the plot to let user know it's not broken
+    plot_type = conf_dict['plot_type']
+    if len(transactions) == 1 and transactions.loc[0]['description'] == 'No Available Data':
+        text = 'No data found for these filters. Try selecting a different filter.'
+        all_data = MD.transactions_table.find()
+        try:
+            len(all_data)
+            desc = all_data.loc[0]['description']
+        except TypeError:
+            all_data = list(all_data)
+            desc = all_data[0]['description'] == 'No Available Data'
+        if len(all_data) == 1 and desc == 'No Available Data':
+            text = 'No data found. Start by adding a transaction CSV file or individual transaction on the right.'
+        plot_type = 'text_only'
+
+    # Filter transactions to display
     transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
 
     # Make bar plot
-    if conf_dict['plot_type'] == 'bar':
+    if plot_type == 'bar':
         fig_obj = go.Figure()
         lab_val = _sort_plot_data()
         trace_count = 0
@@ -73,7 +91,7 @@ def make_trends_plot(conf_dict):
         fig_obj.update_layout(barmode='stack')
 
     # Or make pie plot
-    elif conf_dict['plot_type'] == 'pie':
+    elif plot_type == 'pie':
         fig_obj = make_subplots(rows=1, cols=2, subplot_titles=['Income', 'Spending'], specs=[[{'type': 'domain'}, {'type': 'domain'}]])
         lab_val = _sort_plot_data()
         # TODO try and figure out a better hover label for the plots
@@ -83,7 +101,7 @@ def make_trends_plot(conf_dict):
                                  meta=lab_val['Spending']['values'], hovertemplate="%{label}<br>$%{meta:.2f}<extra></extra>"), 1, 2)
 
     # Or plot over time
-    elif conf_dict['plot_type'] == 'time':
+    elif plot_type == 'time':
         fig_obj = go.Figure()
 
         # Get each date to query data, filtering by day/week/month based on overall length of time window
@@ -95,8 +113,10 @@ def make_trends_plot(conf_dict):
             iter_delta = relativedelta(weeks=1)
         elif display_delta < timedelta(days=365):
             iter_delta = relativedelta(months=1)
+            days.append(date(end_date.year, end_date.month, 1))
         else:
             iter_delta = relativedelta(years=1)
+            days.append(date(end_date.year, 1, 1))
         while True:
             previous_date = date(days[-1].year, days[-1].month, days[-1].day) - iter_delta
             days.append(previous_date)
@@ -105,8 +125,10 @@ def make_trends_plot(conf_dict):
 
         # Calculate spending at each date
         val_dict = {}
+        net = []
         for i in range(len(days) - 1):
             this_month = transactions[(transactions['date'].dt.date < days[i]) & (transactions['date'].dt.date >= days[i + 1])]
+            net.append(this_month['amount'].sum())
             for cat, grp in this_month.groupby('category'):
                 try:
                     val_dict[cat]['date'].append(days[i+1])
@@ -117,6 +139,10 @@ def make_trends_plot(conf_dict):
         # Alphabetize list of categories
         val_dict = dict(sorted(val_dict.items()))
 
+        # Add lines and bars
+        fig_obj.add_trace(go.Scatter(x=days[1:], y=net, name='Net Transactions', mode='markers+lines',
+                                     marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
+                                     hovertemplate="%{x}<br>$%{y:.2f}<extra></extra>"))
         for key, val in val_dict.items():
             fig_obj.add_trace(go.Bar(x=val['date'], y=val['amount'], name=key, legendgroup=key,
                                      meta=key, hovertemplate="%{meta}<br>$%{y:.2f}<extra></extra>"))
@@ -125,7 +151,11 @@ def make_trends_plot(conf_dict):
         fig_obj.update_yaxes(title_text="Amount ($)")
         fig_obj.update_layout(barmode='relative')
 
-    # Standard figure layout
+    elif plot_type == 'text_only':
+        fig_obj = go.Figure()
+        fig_obj.add_annotation(text=text, xref="paper", yref="paper", x=0.5, y=0.75, showarrow=False,
+                               bordercolor="#162432", borderwidth=2, borderpad=5, bgcolor="#AFBDCB",
+                               font=dict(size=20))
     update_layout_axes(fig_obj)
     return fig_obj
 
