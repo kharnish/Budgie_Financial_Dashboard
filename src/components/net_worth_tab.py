@@ -1,8 +1,9 @@
-from dash import dcc, html
+import dash
+from dash import callback, dcc, html, Input, Output
+import dash_bootstrap_components as dbc
 from datetime import date, timedelta, datetime
 import pandas as pd
 import plotly.graph_objects as go
-
 
 from utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
 
@@ -90,10 +91,12 @@ def make_net_worth_plot(conf_dict):
                 stackgroup = 'one'
             else:
                 stackgroup = 'two'
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup))
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup,
+                                         hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
 
         fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
-                                     marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3}))
+                                     marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
+                                     hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
 
         # Standard figure layout
         update_layout_axes(fig_obj)
@@ -101,9 +104,33 @@ def make_net_worth_plot(conf_dict):
 
 
 net_worth_tab = dcc.Tab(label="Net Worth", value='Net Worth', children=[
-    html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px 20px', 'align': 'center'}, className='tab-body',
+    html.Div(style={'width': '100%', 'height': '700px', 'padding': '10px', 'align': 'center'}, className='tab-body',
              children=[
+                 html.Div(style={'padding': '0 5px 0 0', 'float': 'right'}, children=[
+                     html.I(className="fa-solid fa-circle-question", id='help-worth')]),
+                 dbc.Modal(id="worth-help", is_open=False, children=[
+                     dbc.ModalHeader(dbc.ModalTitle("Net Worth Help")),
+                     dbc.ModalBody(children=['The Net Worth tab allows you to see your net worth over time.', html.Br(), html.Br(),
+                                             'It works by adding all the transactions in each account to get your current balance.'
+                                             'Once an account has been created and transactions added, you will need to do a one-time manual adjustment to the Initial Balance '
+                                             'of the account in the Configurations tab so the calculated total assets includes all transactions not uploaded to Budgie and the '
+                                             'value matches your current actual total assets. ', html.Br(), html.Br(),
+                                             'For example, if after loading in your transactions, the Net Worth tab shows a total value of $547.35 but your actual current balance '
+                                             'is $942.84, then you should set the account Initial Value to $395.49 (942.84 - 547.35).', html.Br(), html.Br(),
+                                             'To interact with the plot, you can click and double click the legend items to hide them, and click and drag to zoom in and move around.'])]),
                  html.Div(id="net-worth-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},
                           children=[dcc.Graph(id='net-worth-graph', style={'height': '600px'}, figure=make_net_worth_plot(zero_params_dict()))])
              ]),
 ])
+
+
+@callback(
+    Output('worth-help', 'is_open'),
+    Input('help-worth', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-worth.n_clicks':
+        isopen = True
+    return isopen

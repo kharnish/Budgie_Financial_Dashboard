@@ -1,7 +1,8 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -32,35 +33,41 @@ def make_budget_plot(conf_dict):
     #  Or make it show month-to-month for each category
     transactions = MD.query_transactions(conf_dict)
 
-    percent_list = []
     fig_obj = go.Figure()
+
+    # Calculate overall percent of budget for multiple months
+    start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
+    end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+    display_delta = end_date - start_date
+    months = np.ceil(display_delta.days / 31)
+
+    percent_list = []
     for cat in budget_dict.keys():
         spent = float(transactions[transactions['category'] == cat]['amount'].sum())
-        percent = -100 * spent / budget_dict[cat]
+        budgeted = budget_dict[cat] * months
+        percent = -100 * spent / budgeted
         percent_list.append(percent)
-        diff = budget_dict[cat] - abs(spent)
+        diff = budgeted + spent
         if diff > 0:
             m = f"Remaining: $ {diff:.2f}"
         else:
             m = f"Over: $ {-diff:.2f}"
         fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
-                                 meta=[f"$ {budget_dict[cat]:.2f}", f"$ {-spent:.2f}"],
+                                 meta=[f"$ {budgeted:,.2f}", f"$ {-spent:,.2f}"],
                                  hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
 
     max_x = max(percent_list) if percent_list else 0
-    fig_obj.update_layout(xaxis_range=[0, max_x * 1.1])
+    min_x = min(percent_list) if percent_list and min(percent_list) < 0 else 0
+    fig_obj.update_layout(xaxis_range=[min_x * 1.1, max_x * 1.1])
 
-    fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
-
-    # Make a vertical line to show progress through the month
-    start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
-    end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
+    # Make a vertical line to limit and progress through the month
     today = date.today()
     if start_date <= today <= end_date:
-        progress = (today - date(today.year, today.month, 1)).days
-        progress = 100 * progress / 31
+        progress = (today - start_date).days
+        progress = 100 * progress / (31 * months)
         fig_obj.add_vline(x=progress, line_width=1, line_color=COLORS['light'].get('gridgray'))
+    fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
 
     # Standard figure layout, but don't show horizontal lines
     update_layout_axes(fig_obj)
@@ -74,8 +81,17 @@ def make_budget_plot(conf_dict):
 budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
                         html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
                                  children=[
+                                     html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-budget',
+                                              children=[html.I(className="fa-solid fa-circle-question")]),
+                                     dbc.Modal(id="budget-help", is_open=False, children=[
+                                         dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
+                                         dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
+                                                                 'Set a new category budget or update an exising budget with the Add or Update Budget button', html.Br(), html.Br(),
+                                                                 'The thick line shows your limit of 100%, while the thinner line shows how far through the month you are.'])]),
+
                                      dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
                                                id='budget-graph', figure=make_budget_plot(zero_params_dict())),
+
                                      html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
                                               children=[html.Button(id='new-budget-button', style={'width': 'auto'},
                                                                     children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
@@ -200,3 +216,15 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         avg_str = None
 
     return is_open, categories, budget_category, budget_value, msg_str, msg_style, avg_str, avg_style, delete, update_tab
+
+
+@callback(
+    Output('budget-help', 'is_open'),
+    Input('help-budget', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-budget.n_clicks':
+        isopen = True
+    return isopen

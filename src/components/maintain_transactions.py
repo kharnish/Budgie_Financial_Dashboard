@@ -95,6 +95,9 @@ class MaintainDatabase:
                 else:
                     new_vals.append(-vals[i])
             df['amount'] = new_vals
+        elif isinstance(df.loc[0]['amount'], str):
+            df['amount'] = [''.join(val.split('$')) for val in df['amount']]
+            df['amount'] = df['amount'].astype(float)
         if 'original description' not in df.columns:
             df['original description'] = df['description']
         account_labels = True if 'account name' in df.columns else False
@@ -103,7 +106,9 @@ class MaintainDatabase:
         if 'category' not in df.columns or account:
             df['category'] = ''
 
+        # Replace NA with empty string and remove transactions with no date
         df = df.fillna('')
+        df = df.dropna(subset='date', axis='index')
 
         # If only one account for that file, get autocategorization categories from previous data
         if account:
@@ -124,6 +129,7 @@ class MaintainDatabase:
 
             duplicates = self.transactions_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1})
             if isinstance(duplicates, pd.DataFrame):
+                # TODO verify that this works with CSV and BudgieDF
                 len_dups = len(duplicates)
                 duplicates = duplicates.iterrows()
             else:
@@ -151,8 +157,8 @@ class MaintainDatabase:
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
-                        # If the transaction date is overt 10 days from the duplicate, it's probably a recurring and not a duplicate
-                        if abs((dup['date'] - row['date'])) > timedelta(days=10):
+                        # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
+                        if abs((dup['date'] - row['date'])) > timedelta(days=7):
                             print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} / "
                                   f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))

@@ -38,6 +38,8 @@ COLORS = {
 }
 
 # Instantiate data interface
+print('Welcome to Budgie! \n\n'
+      'To get started, open a web browser and go to http://127.0.0.1:8050/ \n\n')
 load_dotenv()
 if os.getenv("MONGO_HOST") is not None:
     MD = MaintainDatabase()

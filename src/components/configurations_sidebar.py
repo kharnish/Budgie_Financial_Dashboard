@@ -10,7 +10,6 @@ import pandas as pd
 
 from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
-
 configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
                                   children=[
                                       dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
@@ -65,11 +64,13 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                           html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
                                                    children=['Select Account to Upload Transactions  ',
                                                              html.I(className="fa-solid fa-circle-info", id='help-icon'),
-                                                             dbc.Tooltip("Select the corresponding account for the transactions CSV file. "
-                                                                         "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down.  "
-                                                                         "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
-                                                                         "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. "
-                                                                         "You can select multiple files to upload simultaneously for the same account. ",
+                                                             dbc.Tooltip(children=["Select the corresponding account for the transactions CSV file. ", html.Br(),
+                                                                                   "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down. ",
+                                                                                   html.Br(),
+                                                                                   "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
+                                                                                   "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. ",
+                                                                                   html.Br(),
+                                                                                   "You can select multiple files to upload simultaneously for the same account. "],
                                                                          target='help-icon',
                                                                          placement='right',
                                                                          style={'font-size': 14, 'maxWidth': 800, 'width': 800},
@@ -148,6 +149,7 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                           html.I(id='export-message', style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
                                       ]),
                                   ])
+
 
 @callback(
     Output('current-config-memory', 'data'),
@@ -318,6 +320,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                 MD.add_account(new_account)
             if new_category:
                 MD.add_category(new_category)
+            MD.export_data_to_csv()
             category = 'unknown'
             new_category = None
             amount = '$ 0'
@@ -394,21 +397,28 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 msg.append(html.Br())
                 continue
 
-            results = MD.load_transactions(m, account)
-            account = None
-            if new_account:
-                MD.add_account(new_account)
-            if isinstance(results, int):
-                if results == 0:
-                    msg.append(f"File {i + 1}: No new transactions to upload")
-                    msg.append(html.Br())
+            try:
+                results = MD.load_transactions(m, account)
+                account = None
+                if new_account:
+                    MD.add_account(new_account)
+                    MD.export_data_to_csv()
+                if isinstance(results, int):
+                    if results == 0:
+                        msg.append(f"File {i + 1}: No new transactions to upload")
+                        msg.append(html.Br())
+                    else:
+                        msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
+                        msg.append(html.Br())
+                        update_tab = True
                 else:
-                    msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
+                    msg.append(f"File {i + 1}: {results}\n")
                     msg.append(html.Br())
-                    update_tab = True
-            else:
-                msg.append(f"File {i + 1}: {results}\n")
+
+            except Exception as e:
+                msg.append(f"File {i + 1} Error: Could not parse transactions")
                 msg.append(html.Br())
+
     elif trigger == 'account-input.value':
         account_input = {'display': 'inline-block', 'width': '100%'}
         upload_button = False

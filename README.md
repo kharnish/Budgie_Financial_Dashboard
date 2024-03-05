@@ -21,7 +21,7 @@ Type your account name and instantiate that account by selecting a transaction C
 Once the account is logged in your database, you can upload more transactions CSV files under that account. 
 You can select multiple files to upload simultaneously for the same account.
 
-You can also manually input transactions with the "Add Mantual Transaction" menu.
+You can also manually input transactions with the "Add Manual Transaction" menu.
 
 To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
 in the CSV file and simply leave the "New account name" input empty when uploading the file.
@@ -39,9 +39,9 @@ and use the filters on the Configurations sidebar to look for trends in your fin
 ## Running Budgie
 
 ### Use the Executable
-Simply download the `Budgie.exe` file to your computer. When you launch it, it will open a command window with logging information.
+Download the [newest version of Budgie](https://1drv.ms/f/s!AmMd5hpZTnZ3hZEyNDFWxb45dM2M5Q?e=wP6Yvv). When you launch it, it will open a command window with logging information.
 
-Open your preferred web browser and go to http://127.0.0.1:8050/ to access the app. 
+Open a web browser and go to http://127.0.0.1:8050/ to access the app. 
 
 
 ### Clone the Source Code
