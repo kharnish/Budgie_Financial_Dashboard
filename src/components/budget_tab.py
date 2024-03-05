@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
 import numpy as np
@@ -47,18 +47,19 @@ def make_budget_plot(conf_dict):
         budgeted = budget_dict[cat] * months
         percent = -100 * spent / budgeted
         percent_list.append(percent)
-        diff = budgeted - abs(spent)
+        diff = budgeted + spent
         if diff > 0:
             m = f"Remaining: $ {diff:.2f}"
         else:
             m = f"Over: $ {-diff:.2f}"
         fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
-                                 meta=[f"$ {budgeted:.2f}", f"$ {-spent:.2f}"],
+                                 meta=[f"$ {budgeted:,.2f}", f"$ {-spent:,.2f}"],
                                  hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
     fig_obj.update_xaxes(title_text="% Spent")
 
     max_x = max(percent_list) if percent_list else 0
-    fig_obj.update_layout(xaxis_range=[0, max_x * 1.1])
+    min_x = min(percent_list) if percent_list and min(percent_list) < 0 else 0
+    fig_obj.update_layout(xaxis_range=[min_x * 1.1, max_x * 1.1])
 
     # Make a vertical line to limit and progress through the month
     today = date.today()
@@ -80,8 +81,17 @@ def make_budget_plot(conf_dict):
 budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
                         html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
                                  children=[
+                                     html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-budget',
+                                              children=[html.I(className="fa-solid fa-circle-question")]),
+                                     dbc.Modal(id="budget-help", is_open=False, children=[
+                                         dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
+                                         dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
+                                                                 'Set a new category budget or update an exising budget with the Add or Update Budget button', html.Br(), html.Br(),
+                                                                 'The thick line shows your limit of 100%, while the thinner line shows how far through the month you are.'])]),
+
                                      dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
                                                id='budget-graph', figure=make_budget_plot(zero_params_dict())),
+
                                      html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
                                               children=[html.Button(id='new-budget-button', style={'width': 'auto'},
                                                                     children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
@@ -206,3 +216,15 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         avg_str = None
 
     return is_open, categories, budget_category, budget_value, msg_str, msg_style, avg_str, avg_style, delete, update_tab
+
+
+@callback(
+    Output('budget-help', 'is_open'),
+    Input('help-budget', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-budget.n_clicks':
+        isopen = True
+    return isopen

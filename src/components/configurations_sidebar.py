@@ -10,7 +10,6 @@ import pandas as pd
 
 from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
-
 configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
                                   children=[
                                       dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
@@ -65,11 +64,13 @@ configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'flo
                                           html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
                                                    children=['Select Account to Upload Transactions  ',
                                                              html.I(className="fa-solid fa-circle-info", id='help-icon'),
-                                                             dbc.Tooltip("Select the corresponding account for the transactions CSV file. "
-                                                                         "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down.  "
-                                                                         "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
-                                                                         "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. "
-                                                                         "You can select multiple files to upload simultaneously for the same account. ",
+                                                             dbc.Tooltip(children=["Select the corresponding account for the transactions CSV file. ", html.Br(),
+                                                                                   "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down. ",
+                                                                                   html.Br(),
+                                                                                   "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
+                                                                                   "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. ",
+                                                                                   html.Br(),
+                                                                                   "You can select multiple files to upload simultaneously for the same account. "],
                                                                          target='help-icon',
                                                                          placement='right',
                                                                          style={'font-size': 14, 'maxWidth': 800, 'width': 800},

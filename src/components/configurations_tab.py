@@ -1,17 +1,14 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 import pandas as pd
 
-from utils import zero_params_dict, MD
+from utils import MD, get_categories_list
 
 
-def make_accounts_table(conf_dict):
+def make_accounts_table(check_update=False):
     """Query account metadata and organize into data and columns
-
-    Args:
-        conf_dict: Dictionary of the configuration parameters.
 
     Returns: Data and Columns dictionary
 
@@ -43,20 +40,30 @@ def make_accounts_table(conf_dict):
     return {'data': data, 'columns': columns}
 
 
-def make_categories_table(conf_dict):
+def make_categories_table(check_update=False):
     """Query category metadata and organize into data and columns
 
     Args:
-        conf_dict: Dictionary of the configuration parameters.
+        check_update: Check for updates from the transactions, only necessary every once in a while
 
     Returns: Data and Columns dictionary
-
     """
     # Query and organize account data
     cats = pd.DataFrame(MD.categories_table.find())
 
     if len(cats) == 0:
         return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
+
+    if check_update:
+        # If you delete all items from a category, it needs to trigger to delete the name
+        current_cats = get_categories_list()
+        refresh = False
+        for cat, grp in cats.iterrows():
+            if grp['category name'] not in current_cats:
+                MD.delete_category([grp.to_dict()])
+                refresh = True
+        if refresh:
+            cats = pd.DataFrame(MD.categories_table.find())
 
     categories = cats.drop(columns=['_id', 'parent'])
     data = categories.to_dict('records')
@@ -66,8 +73,8 @@ def make_categories_table(conf_dict):
 
 
 # Make initial tables
-acc_tab = make_accounts_table(zero_params_dict())
-cat_tab = make_categories_table(zero_params_dict())
+acc_tab = make_accounts_table(True)
+cat_tab = make_categories_table(True)
 
 configurations_tab = dcc.Tab(label="Configurations", value='Configurations', children=[
     html.Div(style={'width': '100%', 'height': '700px', 'padding': '5px', 'align': 'center'}, className='tab-body',
@@ -76,7 +83,8 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
-                                                            style={'width': '100px'}, id="categories-delete", disabled=True, color="danger")]),
+                                                            style={'display': 'none'},  # {'width': '100px'},
+                                                            id="categories-delete", disabled=True, color="danger")]),
                               dag.AgGrid(id="categories-table",
                                          style={"height": '600px'},
                                          dashGridOptions={"rowSelection": "multiple"},
@@ -85,11 +93,22 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                          columnSize="autoSize",
                                          defaultColDef={'filter': True, "resizable": True, 'sortable': True},
                                          )]),
+
                  html.Div(style={'width': '60%', 'display': 'inline-block', 'padding': '5px'},
                           children=[
+                              html.Div(style={'padding': '0 5px 0 0', 'float': 'right'}, id='help-configuration',
+                                       children=[html.I(className="fa-solid fa-circle-question")]),
+                              dbc.Modal(id="configuration-help", is_open=False, children=[
+                                  dbc.ModalHeader(dbc.ModalTitle("Configuration Help")),
+                                  dbc.ModalBody(children=['The Configurations tab shows all Categories and Accounts.', html.Br(), html.Br(),
+                                                          'As described on the Net Worth tab, the Initial Balance of each account should be set so the calculations match your current assets. '
+                                                          'It is equivalent to account balance before the date of the first transaction from that account in Budgie.', html.Br(), html.Br(),
+                                                          'Account status can also be changed to Open or Closed.'])]),
+
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
-                                                            style={'width': '100px'}, id="accounts-delete", disabled=True, color="danger")]),
+                                                            style={'display': 'none'},  # {'width': '100px'},
+                                                            id="accounts-delete", disabled=True, color="danger")]),
                               dag.AgGrid(id="accounts-table",
                                          dashGridOptions={"domLayout": "autoHeight", "rowSelection": "multiple"},
                                          rowData=acc_tab['data'],
@@ -97,9 +116,9 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                          columnSize="autoSize",
                                          defaultColDef={'filter': True, "resizable": True, 'sortable': True},
                                          ),
-                              ]),
+                          ]),
              ])
-    ])
+])
 
 
 @callback(
@@ -140,3 +159,15 @@ def update_categories_table(delete, row_data):
         update_tab = True
 
     return enabled, update_tab
+
+
+@callback(
+    Output('configuration-help', 'is_open'),
+    Input('help-configuration', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-configuration.n_clicks':
+        isopen = True
+    return isopen

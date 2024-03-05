@@ -107,13 +107,18 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                      html.Div(style={'padding': '10px', 'display': 'inline-block'},
                               children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
                                                    style={'width': '100px'}, id="transact-delete", disabled=True, color="danger")]),
-                     html.I(className="fa-solid fa-circle-info", id='help-icon-2'),
-                     dbc.Tooltip("Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. "
-                                 "Press the space bar to undo/redo your selection",
-                                 target='help-icon-2',
-                                 placement='right',
-                                 style={'font-size': 14},
-                                 ),
+
+                     html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-transactions',
+                              children=[html.I(className="fa-solid fa-circle-question")]),
+                     dbc.Modal(id="transactions-help", is_open=False, children=[
+                         dbc.ModalHeader(dbc.ModalTitle("Transactions Help")),
+                         dbc.ModalBody(children=['The Transactions tab allows you to see and edit your individual transactions.', html.Br(), html.Br(),
+                                                 'Add new transactions either by uploading a CSV file or inputting a manual transaction.', html.Br(), html.Br(),
+                                                 'Edit a transaction by double clicking the value to modify, or select it and use the Edit button.', html.Br(), html.Br(),
+                                                 'Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. '
+                                                 'Press the space bar to undo/redo your selection.'
+                                                 ])]),
+
                      dag.AgGrid(id="transactions-table",
                                 style={"height": '600px'},
                                 rowData=tab.get('data'),
@@ -265,3 +270,15 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
 
     return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, \
         account_style, new_account, msg_str, new_note, update_tab
+
+
+@callback(
+    Output('transactions-help', 'is_open'),
+    Input('help-transactions', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-transactions.n_clicks':
+        isopen = True
+    return isopen
