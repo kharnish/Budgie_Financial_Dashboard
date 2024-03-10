@@ -320,14 +320,20 @@ class MaintainDatabase:
     """====== Category ======"""
     def add_category(self, category_name, category_parent=None):
         """Add new category in database ... """
-        return self.categories_table.insert_one({'parent': category_parent, 'category name': category_name})
+        return self.categories_table.insert_one({'parent': category_parent, 'category name': category_name, 'hidden': False})
 
     def edit_category(self, change_dict):
         """Update category data based on edits in Categories table"""
         new_dict = change_dict[0]['data']
+        new_dict.pop('_id')
+        new_dict.pop('parent')  # TODO this is a quick fix that will need to be updated when it actually uses parents more
         old_dict = change_dict[0]['data'].copy()
         old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
         return self.categories_table.update_one(old_dict, {'$set': new_dict})
+
+    def get_hide_from_trends(self):
+        """Get list of all categories hidden from trends"""
+        return [row['category name'] for row in self.categories_table.find({'hidden': True})]
 
     def delete_category(self, row_data):
         """Delete category in database"""

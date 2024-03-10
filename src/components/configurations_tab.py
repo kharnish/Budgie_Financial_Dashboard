@@ -68,6 +68,7 @@ def make_categories_table(check_update=False):
             categories = pd.DataFrame(MD.categories_table.find())
 
     categories.loc[:, '_id'] = [str(tid) for tid in categories['_id']]
+    categories = categories.loc[categories["category name"].str.lower().sort_values().index]
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -77,6 +78,8 @@ def make_categories_table(check_update=False):
             col['hide'] = True
         elif col['field'] == 'parent':
             col['hide'] = True
+        elif col['field'] == 'hidden':
+            col['editable'] = True
 
     return {'data': data, 'columns': columns}
 

@@ -252,6 +252,7 @@ class MaintainCSV(MaintainDatabase):
         """Add new category in dataframe"""
         self.categories_table = BudgieDF(pd.concat([self.categories_table, pd.DataFrame({'parent': [category_parent],
                                                                                          'category name': [category_name],
+                                                                                         'hidden': False,
                                                                                          '_id': uuid.uuid4()})], ignore_index=True))
 
     def delete_category(self, row_data):
