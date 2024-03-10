@@ -255,6 +255,19 @@ class MaintainCSV(MaintainDatabase):
                                                                                          'hidden': False,
                                                                                          '_id': uuid.uuid4()})], ignore_index=True))
 
+    def edit_category(self, change_dict):
+        """Update category data based on edits in Categories table"""
+        new_dict = change_dict[0]['data']
+        tid = new_dict['_id']
+        existing = self.categories_table[self.categories_table['_id'] == tid]
+        for key, val in new_dict.items():
+            self.categories_table.loc[existing.index, key] = new_dict[key]
+        self.export_data_to_csv()
+
+    def get_hide_from_trends(self):
+        """Get list of all categories hidden from trends"""
+        return [row['category name'] for i, row in self.categories_table.find({'hidden': True}).iterrows()]
+
     def delete_category(self, row_data):
         """Delete category in database"""
         pass
