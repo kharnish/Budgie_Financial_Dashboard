@@ -19,7 +19,7 @@ def make_accounts_table(check_update=False):
     if len(accounts) == 0:
         return {'data': [{'Account Name': 'No accounts'}], 'columns': [{"field": 'Account Name'}]}
 
-    accounts = accounts.drop(columns=['_id'])
+    accounts.loc[:, '_id'] = [str(tid) for tid in accounts['_id']]
     accounts = accounts.sort_values('account name')
     data = accounts.to_dict('records')
     columns = [{"field": i} for i in accounts.columns]
@@ -36,6 +36,8 @@ def make_accounts_table(check_update=False):
             col['editable'] = True
             col['cellEditor'] = 'agSelectCellEditor'
             col['cellEditorParams'] = {'values': ['open', 'closed']}
+        elif col['field'] == '_id':
+            col['hide'] = True
 
     return {'data': data, 'columns': columns}
 
@@ -49,25 +51,32 @@ def make_categories_table(check_update=False):
     Returns: Data and Columns dictionary
     """
     # Query and organize account data
-    cats = pd.DataFrame(MD.categories_table.find())
+    categories = pd.DataFrame(MD.categories_table.find())
 
-    if len(cats) == 0:
+    if len(categories) == 0:
         return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
 
     if check_update:
         # If you delete all items from a category, it needs to trigger to delete the name
         current_cats = get_categories_list()
         refresh = False
-        for cat, grp in cats.iterrows():
+        for cat, grp in categories.iterrows():
             if grp['category name'] not in current_cats:
                 MD.delete_category([grp.to_dict()])
                 refresh = True
         if refresh:
-            cats = pd.DataFrame(MD.categories_table.find())
+            categories = pd.DataFrame(MD.categories_table.find())
 
-    categories = cats.drop(columns=['_id', 'parent'])
+    categories.loc[:, '_id'] = [str(tid) for tid in categories['_id']]
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
+
+    # Update the column format for each column
+    for col in columns:
+        if col['field'] == '_id':
+            col['hide'] = True
+        elif col['field'] == 'parent':
+            col['hide'] = True
 
     return {'data': data, 'columns': columns}
 
@@ -159,6 +168,40 @@ def update_categories_table(delete, row_data):
         update_tab = True
 
     return enabled, update_tab
+
+
+@callback(
+    Output('accounts-delete', 'disabled'),
+    Output('update-tab', 'data', allow_duplicate=True),
+
+    Input('accounts-delete', 'n_clicks'),
+    Input('accounts-table', 'selectedRows'),
+    prevent_initial_call=True,
+)
+def update_accounts_table(delete, row_data):
+    trigger = dash.callback_context.triggered[0]['prop_id']
+
+    enabled = True
+    update_tab = no_update
+
+    if trigger == 'accounts-table.selectedRows' and (row_data is None or len(row_data) > 0):
+        enabled = False
+
+    elif trigger == 'accounts-delete.n_clicks':
+        MD.delete_category(row_data)
+        update_tab = True
+
+    return enabled, update_tab
+
+
+@callback(
+    Output('blank-space-2', 'children'),
+    Input('accounts-table', 'cellValueChanged')
+)
+def update_table_data(change_data):
+    if change_data:
+        MD.edit_account(change_data)
+    return ''
 
 
 @callback(

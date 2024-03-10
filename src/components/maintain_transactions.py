@@ -276,6 +276,7 @@ class MaintainDatabase:
             trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
             self.transactions_table.delete_one(trans)
 
+    """====== Budget ======"""
     def add_budget_item(self, category, value):
         """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
@@ -284,18 +285,39 @@ class MaintainDatabase:
         else:
             return self.budget_table.insert_one({'category': category, 'value': value})
 
+    def get_budget_dict(self):
+        """Get dictionary of all positive and negative budget line items"""
+        pos_dict = {}
+        neg_dict = {}
+        for item in self.budget_table.find():
+            if item['value'] > 0:
+                pos_dict[item['category']] = item['value']
+            else:
+                neg_dict[item['category']] = item['value']
+        return pos_dict, neg_dict
+
     def rm_budget_item(self, category, value):
         """Delete budget item in database"""
         return self.budget_table.delete_one({'category': category, 'value': value})
 
+    """====== Account ======"""
     def add_account(self, account_name, status='open', initial_balance=0):
         """Add new account in database with current status and beginning balance for net worth"""
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
+
+    def edit_account(self, change_dict):
+        """Update accounts based on edits in Accounts table"""
+        new_dict = change_dict[0]['data']
+        new_dict.pop('_id')
+        old_dict = change_dict[0]['data'].copy()
+        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        return self.accounts_table.update_one(old_dict, {'$set': new_dict})
 
     def delete_account(self, row_data):
         """Delete account in database"""
         return self.accounts_table.delete_one(row_data)
 
+    """====== Category ======"""
     def add_category(self, category_name, category_parent=None):
         """Add new category in database ... """
         return self.categories_table.insert_one({'parent': category_parent, 'category name': category_name})
@@ -314,6 +336,7 @@ class MaintainDatabase:
                 row['parent'] = None
             return self.categories_table.delete_one(row)
 
+    """====== Overall ======"""
     def export_data_to_csv(self, root=None):
         """Save database data to CSV files"""
         root = self.file_dir if root is None else root

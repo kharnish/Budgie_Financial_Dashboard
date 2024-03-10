@@ -192,6 +192,7 @@ class MaintainCSV(MaintainDatabase):
             self.transactions_table = BudgieDF(self.transactions_table.drop(rm_i))
         self.export_data_to_csv()
 
+    """====== Budget ======"""
     def add_budget_item(self, category, value):
         """Add new budget item in dataframe with category and monthly value"""
         try:  # Check for when there's no budget items yet
@@ -207,12 +208,24 @@ class MaintainCSV(MaintainDatabase):
                                                                                      '_id': uuid.uuid4()})], ignore_index=True))
         self.export_data_to_csv()
 
+    def get_budget_dict(self):
+        """Get dictionary of all positive and negative budget line items"""
+        pos_dict = {}
+        neg_dict = {}
+        for i, item in self.budget_table.find().iterrows():
+            if item['value'] > 0:
+                pos_dict[item['category']] = item['value']
+            else:
+                neg_dict[item['category']] = item['value']
+        return pos_dict, neg_dict
+
     def rm_budget_item(self, category, value):
         """Delete budget item in dataframe"""
         rm_i = self.budget_table[(self.budget_table['category'] == category) & (self.budget_table['value'] == value)].index
         self.budget_table = BudgieDF(self.budget_table.drop(rm_i))
         self.export_data_to_csv()
 
+    """====== Account ======"""
     def add_account(self, account_name, status='open', initial_balance=0):
         """Add new account in dataframe with current status and beginning balance for net worth"""
         self.accounts_table = BudgieDF(pd.concat([self.accounts_table, pd.DataFrame({'account name': [account_name],
@@ -220,11 +233,21 @@ class MaintainCSV(MaintainDatabase):
                                                                                      'initial balance': [initial_balance],
                                                                                      '_id': uuid.uuid4()})], ignore_index=True))
 
+    def edit_account(self, change_dict):
+        """Update account based on edits in Accounts table"""
+        new_dict = change_dict[0]['data']
+        tid = new_dict['_id']
+        existing = self.accounts_table[self.accounts_table['_id'] == tid]
+        for key, val in new_dict.items():
+            self.accounts_table.loc[existing.index, key] = new_dict[key]
+        self.export_data_to_csv()
+
     def delete_account(self, row_data):
         """Delete account in database"""
         rm_i = self.accounts_table[(self.accounts_table['_id'] == row_data['_id'])].index
         self.accounts_table = BudgieDF(self.accounts_table.drop(rm_i))
 
+    """====== Category ======"""
     def add_category(self, category_name, category_parent=None):
         """Add new category in dataframe"""
         self.categories_table = BudgieDF(pd.concat([self.categories_table, pd.DataFrame({'parent': [category_parent],
@@ -233,10 +256,9 @@ class MaintainCSV(MaintainDatabase):
 
     def delete_category(self, row_data):
         """Delete category in database"""
-        for row in row_data:
-            if row['parent'] == '':
-                row['parent'] = None
-            return self.categories_table.delete_one(row)
+        pass
+        # rm_i = self.categories_table[(self.categories_table['_id'] == row_data['_id'])].index
+        # self.categories_table = BudgieDF(self.categories_table.drop(rm_i))
 
 
 if __name__ == '__main__':
