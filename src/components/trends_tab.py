@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 import utils
-from utils import zero_params_dict, MD, update_layout_axes, EXCLUDE_FROM_BUDGET
+from utils import zero_params_dict, MD, update_layout_axes
 
 
 def make_trends_plot(conf_dict, initial=False):
@@ -64,7 +64,7 @@ def make_trends_plot(conf_dict, initial=False):
         plot_type = 'text_only'
 
     # Filter transactions to display
-    transactions = transactions[~transactions['category'].isin(EXCLUDE_FROM_BUDGET)]
+    transactions = transactions[~transactions['category'].isin(MD.get_hide_from_trends())]
 
     # Make bar plot
     if plot_type == 'bar':
