@@ -113,9 +113,11 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                               dbc.Modal(id="configuration-help", is_open=False, children=[
                                   dbc.ModalHeader(dbc.ModalTitle("Configuration Help")),
                                   dbc.ModalBody(children=['The Configurations tab shows all Categories and Accounts.', html.Br(), html.Br(),
+                                                          "Categories can be marked as Hidden, which means those transactions won't be displayed on the Trends tab. "
+                                                          'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.', html.Br(), html.Br(),
                                                           'As described on the Net Worth tab, the Initial Balance of each account should be set so the calculations match your current assets. '
                                                           'It is equivalent to account balance before the date of the first transaction from that account in Budgie.', html.Br(), html.Br(),
-                                                          'Account status can also be changed to Open or Closed.'])]),
+                                                          'Account status can also be changed to Open or Closed for your record.'])]),
 
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],

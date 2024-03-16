@@ -111,11 +111,11 @@ net_worth_tab = dcc.Tab(label="Net Worth", value='Net Worth', children=[
                  dbc.Modal(id="worth-help", is_open=False, children=[
                      dbc.ModalHeader(dbc.ModalTitle("Net Worth Help")),
                      dbc.ModalBody(children=['The Net Worth tab allows you to see your net worth over time.', html.Br(), html.Br(),
-                                             'It works by adding all the transactions in each account to get your current balance.'
-                                             'Once an account has been created and transactions added, you will need to do a one-time manual adjustment to the Initial Balance '
-                                             'of the account in the Configurations tab so the calculated total assets includes all transactions not uploaded to Budgie and the '
+                                             'For each account, it adds all the transactions to get your current balance. '
+                                             'Once an account has been created, you will need to do a one-time manual adjustment to the Initial Balance '
+                                             'of the account in the Configurations tab so the calculated total assets includes all previous transactions not uploaded to Budgie and the '
                                              'value matches your current actual total assets. ', html.Br(), html.Br(),
-                                             'For example, if after loading in your transactions, the Net Worth tab shows a total value of $547.35 but your actual current balance '
+                                             'For example, if the Net Worth tab shows a total value of $547.35 but your actual current balance '
                                              'is $942.84, then you should set the account Initial Value to $395.49 (942.84 - 547.35).', html.Br(), html.Br(),
                                              'To interact with the plot, you can click and double click the legend items to hide them, and click and drag to zoom in and move around.'])]),
                  html.Div(id="net-worth-plot", style={'width': '100%', 'float': 'left', 'padding': '10px 0 0 0'},

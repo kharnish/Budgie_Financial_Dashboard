@@ -115,8 +115,9 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                  dbc.Modal(id="budget-help", is_open=False, children=[
                      dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
                      dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
-                                             'Set a new category budget or update an exising budget with the Add or Update Budget button', html.Br(), html.Br(),
-                                             'The thick line shows your limit of 100%, while the thinner line shows how far through the month you are.'])]),
+                                             'Set a new category budget or update an exising budget with the Add or Update Budget button.', html.Br(), html.Br(),
+                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(), html.Br(),
+                                             'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.'])]),
 
                  html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Income'])]),
                  dcc.Graph(style=initial_plots[1], id='budget-graph-income', figure=initial_plots[0]),

@@ -67,6 +67,7 @@ Instantiate a Mongo database and store the information in a `.env` file in the t
     
     MONGO_HOST=mongodb://127.0.0.0:27017/
     MONGO_DB=your_database_name
+    BACKUP_DIR=directory to save backup files [optional]
 
 Start the Dash app with `python app()` and then access the app at http://127.0.0.1:8050/.
 

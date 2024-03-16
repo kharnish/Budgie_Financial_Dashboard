@@ -345,7 +345,8 @@ class MaintainDatabase:
     """====== Overall ======"""
     def export_data_to_csv(self, root=None):
         """Save database data to CSV files"""
-        root = self.file_dir if root is None else root
+        load_dotenv()
+        root = os.getenv('BACKUP_DIR') if root is None else root
         for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
