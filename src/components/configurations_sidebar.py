@@ -10,145 +10,146 @@ import pandas as pd
 
 from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
-configurations_sidebar = html.Div(id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
-                                  children=[
-                                      dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
-                                                       children=["Configurations"]),
-                                               html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
-                                                        children=["Sort By"]),
-                                               html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
-                                                               'vertical-align': 'middle'},
-                                                        children=[dcc.Dropdown(id='field-dropdown', value=zero_params_dict()['field_filter'],
-                                                                               clearable=False, searchable=False, className='dropdown',
-                                                                               options=['Category', 'Account Name'],
-                                                                               ),
-                                                                  ]
-                                                        ),
-                                               ]),
-                                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                                        children=['Select Filter']),
-                                               html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
-                                                               'vertical-align': 'middle'},
-                                                        children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
-                                                                               searchable=True, className='dropdown', multi=True,
-                                                                               options=get_categories_list(),
-                                                                               )
-                                                                  ],
-                                                        ),
-                                               ]),
-                                      dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                                        children=['Time Window']),
-                                               html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
-                                                               'vertical-align': 'middle'},
-                                                        children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
-                                                                               clearable=False, searchable=False, className='dropdown',
-                                                                               options=['This Month', 'Last Month', 'Last 3 Months', 'This Year', 'Last Year',
-                                                                                        'All Time', 'Custom'],
-                                                                               )
-                                                                  ],
-                                                        ),
-                                               ]),
-                                      html.Div(style={'display': 'inline-block'},
-                                               children=[dcc.DatePickerRange(
-                                                   id='date-range',
-                                                   min_date_allowed=date(2000, 1, 1),
-                                                   max_date_allowed=date.today(),
-                                                   initial_visible_month=date.today(),
-                                                   end_date=date.today()
-                                               )]),
+configurations_sidebar = html.Div(
+    id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
+    children=[
+        dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
+                         children=["Configurations"]),
+                 html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
+                          children=["Sort By"]),
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                                 'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='field-dropdown', value=zero_params_dict()['field_filter'],
+                                                 clearable=False, searchable=False, className='dropdown',
+                                                 options=['Category', 'Account Name'],
+                                                 ),
+                                    ]
+                          ),
+                 ]),
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                          children=['Select Filter']),
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                                 'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
+                                                 searchable=True, className='dropdown', multi=True,
+                                                 options=get_categories_list(),
+                                                 )
+                                    ],
+                          ),
+                 ]),
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                          children=['Time Window']),
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                                 'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
+                                                 clearable=False, searchable=False, className='dropdown',
+                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'This Year', 'Last Year',
+                                                          'All Time', 'Custom'],
+                                                 )
+                                    ],
+                          ),
+                 ]),
+        html.Div(style={'display': 'inline-block'},
+                 children=[dcc.DatePickerRange(
+                     id='date-range',
+                     min_date_allowed=date(2000, 1, 1),
+                     max_date_allowed=date.today(),
+                     initial_visible_month=date.today(),
+                     end_date=date.today()
+                 )]),
 
-                                      html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px'}),
+        html.I(id='config-input-text', style={'padding': '0px 20px 10px 21px'}),
 
-                                      html.Div('', style={'padding': '0px 20px 20px 20px'}),  # seems to work better than html.Br()
-                                      dbc.Row([
-                                          html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
-                                                   children=['Select Account to Upload Transactions  ',
-                                                             html.I(className="fa-solid fa-circle-info", id='help-icon'),
-                                                             dbc.Tooltip(children=["Select the corresponding account for the transactions CSV file. ", html.Br(),
-                                                                                   "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down. ",
-                                                                                   html.Br(),
-                                                                                   "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
-                                                                                   "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. ",
-                                                                                   html.Br(),
-                                                                                   "You can select multiple files to upload simultaneously for the same account. "],
-                                                                         target='help-icon',
-                                                                         placement='right',
-                                                                         style={'font-size': 14, 'maxWidth': 800, 'width': 800},
-                                                                         )]),
-                                          html.Br(),
-                                          html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
-                                                          'vertical-align': 'middle'},
-                                                   children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
-                                                                          clearable=True, options=get_accounts_list('new'))],
-                                                   ),
-                                          html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
-                                                   children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
-                                                                       placeholder='New account name')], ),
-                                          html.Div(style={'display': 'inline-block'},
-                                                   children=[dcc.Upload(id='upload-data', multiple=True, style={'display': 'inline-block', 'padding': '5px 20px 20px 12px'},
-                                                                        children=[html.Button('Select Transaction CSV')])]),
-                                          html.I(id='upload-message',
-                                                 style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
-                                          html.Div(style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
-                                                   children=[html.Button(children=["Add Manual Transaction ", html.I(className="fa-solid fa-plus")], id="manual-button")]),
+        html.Div('', style={'padding': '0px 20px 20px 20px'}),  # seems to work better than html.Br()
+        dbc.Row([
+            html.Div(style={'width': '95%', 'display': 'inline-block', 'padding': '11px 20px'},
+                     children=['Select Account to Upload Transactions  ',
+                               html.I(className="fa-solid fa-circle-info", id='help-icon'),
+                               dbc.Tooltip(children=["Select the corresponding account for the transactions CSV file. ", html.Br(),
+                                                     "If the account doesn't exist in your database yet, select the 'Add New Account...' option at the bottom of the drop down. ",
+                                                     html.Br(),
+                                                     "To load a transaction file which contains multiple accounts (i.e. from from Mint), "
+                                                     "ensure there is an 'account_name' column and simply leave the 'New account name' blank and upload the file. ",
+                                                     html.Br(),
+                                                     "You can select multiple files to upload simultaneously for the same account. "],
+                                           target='help-icon',
+                                           placement='right',
+                                           style={'font-size': 14, 'maxWidth': 800, 'width': 800},
+                                           )]),
+            html.Br(),
+            html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
+                            'vertical-align': 'middle'},
+                     children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
+                                            clearable=True, options=get_accounts_list('new'))],
+                     ),
+            html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
+                     children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
+                                         placeholder='New account name')], ),
+            html.Div(style={'display': 'inline-block'},
+                     children=[dcc.Upload(id='upload-data', multiple=True, style={'display': 'inline-block', 'padding': '5px 20px 20px 12px'},
+                                          children=[html.Button('Select Transaction CSV')])]),
+            html.I(id='upload-message',
+                   style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
+            html.Div(style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
+                     children=[html.Button(children=["Add Manual Transaction ", html.I(className="fa-solid fa-plus")], id="manual-button")]),
 
-                                          dbc.Modal(id="transaction-modal", is_open=False, children=[
-                                              dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
-                                              dbc.ModalBody(children=[
-                                                  html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
-                                                           children=['Transaction Date', html.Span(" *", style={"color": "red"}), html.Br(),
-                                                                     dcc.DatePickerSingle(
-                                                                         id='transaction-date',
-                                                                         min_date_allowed=date(2000, 1, 1),
-                                                                         max_date_allowed=date.today(),
-                                                                         initial_visible_month=date.today(),
-                                                                     )]),
-                                                  html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
-                                                           children=['Select Account', html.Span(" *", style={"color": "red"}),
-                                                                     dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Select account...',
-                                                                                  style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
-                                                                                  options=get_accounts_list('new'))]),
-                                                  html.Div([dcc.Input(id='modal-account-input', type='text', style={'display': 'inline-block'}, placeholder='New account...')]),
-                                                  html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
-                                                           children=['Transaction Amount', html.Span(" *", style={"color": "red"}), html.Br(),
-                                                                     dcc.Input(id='transaction-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                                  html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
-                                                           children=['Transaction Description', html.Span(" *", style={"color": "red"}), html.Br(),
-                                                                     dcc.Input(id='description-input', type='text', style={'display': 'inline-block', 'width': '100%'},
-                                                                               placeholder='Description...')]),
-                                                  html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
-                                                           children=['Select Category',
-                                                                     dcc.Dropdown(id='modal-category-dropdown', className='dropdown', clearable=True, placeholder='unknown',
-                                                                                  style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
-                                                                                  )]),
-                                                  html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category...')]),
-                                                  html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
-                                                           children=['Transaction Note', html.Br(),
-                                                                     dcc.Input(id='note-input', type='text', style={'display': 'inline-block', 'width': '100%'},
-                                                                               placeholder='Optional')]),
-                                                  html.Div(id='modal-transaction-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'}, ),
-                                              ]),
-                                              dbc.ModalFooter([
-                                                  html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="t-modal-cancel", className="ms-auto")]),
-                                                  dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
-                                                             id="t-modal-submit", className="ms-auto", style={'float': 'left'})]
-                                              ),
-                                          ]),
+            dbc.Modal(id="transaction-modal", is_open=False, children=[
+                dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
+                dbc.ModalBody(children=[
+                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
+                             children=['Transaction Date', html.Span(" *", style={"color": "red"}), html.Br(),
+                                       dcc.DatePickerSingle(
+                                           id='transaction-date',
+                                           min_date_allowed=date(2000, 1, 1),
+                                           max_date_allowed=date.today(),
+                                           initial_visible_month=date.today(),
+                                       )]),
+                    html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
+                             children=['Select Account', html.Span(" *", style={"color": "red"}),
+                                       dcc.Dropdown(id='modal-account-dropdown', className='dropdown', clearable=True, placeholder='Select account...',
+                                                    style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
+                                                    options=get_accounts_list('new'))]),
+                    html.Div([dcc.Input(id='modal-account-input', type='text', style={'display': 'inline-block'}, placeholder='New account...')]),
+                    html.Div(style={'display': 'inline-block', 'width': '100%', 'padding': '5px 0'},
+                             children=['Transaction Amount', html.Span(" *", style={"color": "red"}), html.Br(),
+                                       dcc.Input(id='transaction-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                    html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
+                             children=['Transaction Description', html.Span(" *", style={"color": "red"}), html.Br(),
+                                       dcc.Input(id='description-input', type='text', style={'display': 'inline-block', 'width': '100%'},
+                                                 placeholder='Description...')]),
+                    html.Div(style={'display': 'inline-block', 'padding': '5px 0'},
+                             children=['Select Category',
+                                       dcc.Dropdown(id='modal-category-dropdown', className='dropdown', clearable=True, placeholder='unknown',
+                                                    style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
+                                                    )]),
+                    html.Div([dcc.Input(id='modal-category-input', type='text', style={'display': 'inline-block'}, placeholder='New category...')]),
+                    html.Div(style={'display': 'inline-block', 'width': '400px', 'padding': '5px 0'},
+                             children=['Transaction Note', html.Br(),
+                                       dcc.Input(id='note-input', type='text', style={'display': 'inline-block', 'width': '100%'},
+                                                 placeholder='Optional')]),
+                    html.Div(id='modal-transaction-text', style={'display': 'inline-block', 'padding': '15px 0 0 0'}, ),
+                ]),
+                dbc.ModalFooter([
+                    html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="t-modal-cancel", className="ms-auto")]),
+                    dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
+                               id="t-modal-submit", className="ms-auto", style={'float': 'left'})]
+                ),
+            ]),
 
-                                          # Overwrite the data files if it's being pulled from CSV
-                                          html.Div(id='export-container', style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
-                                                   children=[html.Button(children=["Export Data ", html.I(className="fa-solid fa-download")],
-                                                                         id="export-button"),
-                                                             html.Div(style={'display': 'inline-block', 'padding': '0 0 0 10px'},
-                                                                      children=[html.I(className="fa-solid fa-circle-info", id='help-icon-3', style={'display': 'inline-block'})]),
-                                                             ]),
-                                          dbc.Tooltip(id='export-tooltip',
-                                                      target='help-icon-3',
-                                                      placement='right',
-                                                      style={'font-size': 14}),
-                                          html.I(id='export-message', style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
-                                      ]),
-                                  ])
+            # Overwrite the data files if it's being pulled from CSV
+            html.Div(id='export-container', style={'padding': '10px 20px', 'display': 'inline-block', 'float': 'right'},
+                     children=[html.Button(children=["Export Data ", html.I(className="fa-solid fa-download")],
+                                           id="export-button"),
+                               html.Div(style={'display': 'inline-block', 'padding': '0 0 0 10px'},
+                                        children=[html.I(className="fa-solid fa-circle-info", id='help-icon-3', style={'display': 'inline-block'})]),
+                               ]),
+            dbc.Tooltip(id='export-tooltip',
+                        target='help-icon-3',
+                        placement='right',
+                        style={'font-size': 14}),
+            html.I(id='export-message', style={'display': 'inline-block', 'padding': '0px 20px 10px 20px'}),
+        ]),
+    ])
 
 
 @callback(
@@ -437,11 +438,12 @@ def export_data(export):
     if isinstance(MD.transactions_table, pd.DataFrame):
         tooltip = f"Export data (transactions, budget, accounts, categories) as CSV files to overwrite current files in:  {os.getenv('DATA_DIR')}."
     else:
-        tooltip = 'Export data (transactions, budget, accounts, categories) as CSV files.'
+        tooltip = 'Export data (transactions, budget, accounts, categories) as CSV files to the root directory, or specified in ' \
+                  'the .env file BACKUP_DIR.'
 
     trigger = dash.callback_context.triggered[0]['prop_id']
     if trigger == 'export-button.n_clicks':
-        MD.export_data_to_csv()
-        msg = f"Saved files to {MD.file_dir}"
+        save_dir = MD.export_data_to_csv()
+        msg = f"Saved files to {save_dir}"
 
     return msg, tooltip

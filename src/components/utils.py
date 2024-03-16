@@ -6,7 +6,6 @@ import sys
 from maintain_transactions import MaintainDatabase
 from maintain_transactions_csv import MaintainCSV
 
-EXCLUDE_FROM_BUDGET = ['Transfer', 'Credit Card Payment']
 EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
 
 PLOTLY_COLORS = [

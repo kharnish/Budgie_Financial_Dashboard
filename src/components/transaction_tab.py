@@ -113,8 +113,8 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                      dbc.Modal(id="transactions-help", is_open=False, children=[
                          dbc.ModalHeader(dbc.ModalTitle("Transactions Help")),
                          dbc.ModalBody(children=['The Transactions tab allows you to see and edit your individual transactions.', html.Br(), html.Br(),
-                                                 'Add new transactions either by uploading a CSV file or inputting a manual transaction.', html.Br(), html.Br(),
-                                                 'Edit a transaction by double clicking the value to modify, or select it and use the Edit button.', html.Br(), html.Br(),
+                                                 'Add new transactions either by uploading a CSV file or inputting a manual transaction from the menu on the left.', html.Br(), html.Br(),
+                                                 'Quick edit a single transaction by double clicking the value to modify, or select row(s) and use the Edit button for more detailed edits.', html.Br(), html.Br(),
                                                  'Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. '
                                                  'Press the space bar to undo/redo your selection.'
                                                  ])]),

@@ -101,9 +101,16 @@ input[type="button"].button-primary:focus {
   border-color: #1EAEDB; }
 
 
+/* Tables
+–––––––––––––––––––––––––––––––––––––––––––––––––– */
+td{
+    font-size: 1.75rem;
+    padding-right: 50px;
+}
+
+
 /* Forms
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
-
 .dropdown, .Select-control { /*dropdown button*/
   background-color: #879CB1 !important;
   border-color: var(--bird-dark-blue) !important;

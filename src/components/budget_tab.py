@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 from utils import zero_params_dict, MD, update_layout_axes, COLORS, get_categories_list
 
 
-def make_budget_plot(conf_dict):
+def make_budget_plots(conf_dict):
     """Make bar plot of budget, showing spending and spending limit for each category.
 
     Args:
@@ -18,22 +18,12 @@ def make_budget_plot(conf_dict):
     Returns: Plotly figure object
 
     """
-    budget_dict = {}
-    if isinstance(MD.budget_table, pd.DataFrame):
-        for i, item in MD.budget_table.find().iterrows():
-            budget_dict[item['category']] = item['value']
-    else:
-        for item in MD.budget_table.find():
-            budget_dict[item['category']] = item['value']
+    # Get and alphabetize list of categories
+    pos_dict, neg_dict = MD.get_budget_dict()
+    pos_dict = dict(sorted(pos_dict.items(), reverse=True))
+    neg_dict = dict(sorted(neg_dict.items(), reverse=True))
 
-    # Alphabetize list of categories
-    budget_dict = dict(sorted(budget_dict.items(), reverse=True))
-
-    # TODO Limit the budget plot to only show one month
-    #  Or make it show month-to-month for each category
     transactions = MD.query_transactions(conf_dict)
-
-    fig_obj = go.Figure()
 
     # Calculate overall percent of budget for multiple months
     start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
@@ -41,86 +31,138 @@ def make_budget_plot(conf_dict):
     display_delta = end_date - start_date
     months = np.ceil(display_delta.days / 31)
 
+    fig_income = go.Figure()
+    fig_spend = go.Figure()
+
     percent_list = []
-    for cat in budget_dict.keys():
-        spent = float(transactions[transactions['category'] == cat]['amount'].sum())
-        budgeted = budget_dict[cat] * months
-        percent = -100 * spent / budgeted
-        percent_list.append(percent)
-        diff = budgeted + spent
-        if diff > 0:
-            m = f"Remaining: $ {diff:.2f}"
-        else:
-            m = f"Over: $ {-diff:.2f}"
-        fig_obj.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
-                                 meta=[f"$ {budgeted:,.2f}", f"$ {-spent:,.2f}"],
-                                 hovertemplate="Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"))
-    fig_obj.update_xaxes(title_text="% Spent")
+    for fig, budget_dict in [[fig_income, pos_dict], [fig_spend, neg_dict]]:
+        for cat in budget_dict.keys():
+            spent = float(transactions[transactions['category'] == cat]['amount'].sum())
+            budgeted = budget_dict[cat] * months
+            percent = 100 * spent / budgeted
+            percent_list.append(percent)
+            diff = spent - budgeted
 
-    max_x = max(percent_list) if percent_list else 0
-    min_x = min(percent_list) if percent_list and min(percent_list) < 0 else 0
-    fig_obj.update_layout(xaxis_range=[min_x * 1.1, max_x * 1.1])
+            if budgeted >= 0:
+                # Income Budget
+                hovertemplate = "Income:     %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"
+                if diff < 0:
+                    m = f"Expected: $ {-diff:,.2f}"
+                else:
+                    m = f"Extra: $ {diff:,.2f}"
+                meta = [f"$ {budgeted:,.2f}", f"$ {spent:,.2f}"]
+            else:
+                # Spending Budget
+                hovertemplate = "Spent:       %{meta[1]}<br>Budgeted: %{meta[0]}<extra></extra>"
+                if diff > 0:
+                    m = f"Remaining: $ {diff:.2f}"
+                else:
+                    m = f"Over: $ {-diff:.2f}"
+                meta = [f"$ {-budgeted:,.2f}", f"$ {-spent:,.2f}"]
 
-    # Make a vertical line to limit and progress through the month
-    today = date.today()
-    if start_date <= today <= end_date:
-        progress = (today - start_date).days
-        progress = 100 * progress / (31 * months)
-        fig_obj.add_vline(x=progress, line_width=1, line_color=COLORS['light'].get('gridgray'))
-    fig_obj.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
+            fig.add_trace(go.Bar(y=[cat], x=[percent], name=cat, orientation='h', text=m, textposition="outside",
+                                 meta=meta, hovertemplate=hovertemplate))
 
-    # Standard figure layout, but don't show horizontal lines
-    update_layout_axes(fig_obj)
-    fig_obj.update_xaxes(showgrid=False)
-    fig_obj.update_yaxes(showgrid=False)
-    fig_obj.update_layout(showlegend=False)
+        max_x = max(percent_list) if percent_list else 0
+        min_x = min(percent_list) if percent_list and min(percent_list) < 0 else 0
+        fig.update_layout(xaxis_range=[min_x * 1.15, max_x * 1.15])
 
-    return fig_obj
+        # Make a vertical line to limit and progress through the month
+        today = date.today()
+        if start_date <= today <= end_date:
+            progress = (today - start_date).days
+            progress = 100 * progress / (31 * months)
+            fig.add_vline(x=progress, line_width=1, line_color=COLORS['light'].get('gridgray'))
+        fig.add_vline(x=100, line_width=3, line_color=COLORS['light'].get('gridgray'))
 
+        # Standard figure layout, but don't show horizontal lines
+        update_layout_axes(fig)
+        fig.update_xaxes(showgrid=False)
+        fig.update_yaxes(showgrid=False)
+        fig.update_layout(showlegend=False)
+
+    fig_spend.update_xaxes(title_text="% Spent")
+
+    # Use a quick linear equation to get the height of the plot based on the number of bars
+    m = 42.573
+    b = 75.297
+    income_height = m * len(pos_dict) + b
+    income_style = {'height': f"{income_height if len(pos_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
+    spend_height = m * len(neg_dict) + b
+    spend_style = {'height': f"{spend_height if len(neg_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
+
+    pos_dict, neg_dict = MD.get_budget_dict()
+    sum_income = sum([v for k, v in pos_dict.items()])
+    sum_spend = sum([v for k, v in neg_dict.items()])
+    delta = sum_income + sum_spend
+
+    equation = [html.Table([
+                     html.Tr([html.Td('Income Budget: '), html.Td(f"$ {sum_income:,.2f}")]),
+                     html.Tr(style={'border-bottom': '1pt solid black'}, children=[html.Td('Spending Budget: '), html.Td(f"$ {sum_spend:,.2f}")]),
+                     html.Tr([html.Td('Remaining: '), html.Td(f"$ {delta:,.2f}")])
+                 ])]
+
+    return fig_income, income_style, fig_spend, spend_style, equation
+
+
+initial_plots = make_budget_plots(zero_params_dict())
 
 budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', children=[
-                        html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
-                                 children=[
-                                     html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-budget',
-                                              children=[html.I(className="fa-solid fa-circle-question")]),
-                                     dbc.Modal(id="budget-help", is_open=False, children=[
-                                         dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
-                                         dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
-                                                                 'Set a new category budget or update an exising budget with the Add or Update Budget button', html.Br(), html.Br(),
-                                                                 'The thick line shows your limit of 100%, while the thinner line shows how far through the month you are.'])]),
+    html.Div(id="budget-plot", style={'width': '100%', 'float': 'left'}, className='tab-body',
+             children=[
+                 html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-budget',
+                          children=[html.I(className="fa-solid fa-circle-question")]),
+                 dbc.Modal(id="budget-help", is_open=False, children=[
+                     dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
+                     dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
+                                             'Set a new category budget or update an exising budget with the Add or Update Budget button.', html.Br(), html.Br(),
+                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(), html.Br(),
+                                             'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.'])]),
 
-                                     dcc.Graph(style={'width': '95%', 'height': '95%', 'padding': '10px 20px 0 20px', 'align': 'center'},
-                                               id='budget-graph', figure=make_budget_plot(zero_params_dict())),
+                 html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Income'])]),
+                 dcc.Graph(style=initial_plots[1], id='budget-graph-income', figure=initial_plots[0]),
+                 html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Spending'])]),
+                 dcc.Graph(style=initial_plots[3], id='budget-graph-spend', figure=initial_plots[2]),
 
-                                     html.Div(style={'display': 'inline-block', 'padding': '5px 0 20px 20px', 'float': 'left', 'width': '95%'},
-                                              children=[html.Button(id='new-budget-button', style={'width': 'auto'},
-                                                                    children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
-                                     dbc.Modal(id="budget-modal", is_open=False, children=[
-                                         dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
-                                         dbc.ModalBody(children=[
-                                             html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
-                                                      children=['Select budget category:',
-                                                                dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
-                                                                             style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
-                                                                             options=[''])]),
-                                             html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
-                                                      children=['Define budget amount:', html.Br(),
-                                                                dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
-                                             html.Div(id='modal-average-text', style={'padding': '5px 0 10px 0'}),
-                                             html.Div(style={'float': 'right', 'position': 'absolute', 'bottom': 10, 'right': 10},
-                                                      children=[dbc.Button(children=["Delete Budget ", html.I(className="fa-solid fa-trash-can")],
-                                                                           id="modal-delete", color="danger", style={'float': 'right'})]),
-                                             html.Div(id='modal-body-text'),
-                                         ]),
-                                         dbc.ModalFooter([
-                                             html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
-                                             dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
-                                                        id="modal-submit", className="ms-auto", style={'float': 'left'})]
-                                         ),
-                                     ]),
-                                 ]),
-                        html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
-                    ])
+                 html.Div(style={'height': '5px', 'width': '99%', 'float': 'left'}, id='blank-space-4'),
+
+                 html.Div(style={'display': 'inline-block', 'padding': '0 40px 20px 20px', 'float': 'left'},
+                          children=[html.Button(id='new-budget-button', style={'width': 'auto'},
+                                                children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
+
+                 dbc.Modal(id="budget-modal", is_open=False, children=[
+                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                     dbc.ModalBody(children=[
+                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
+                                  children=['Select budget category:',
+                                            dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
+                                                         style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
+                                                         options=[''])]),
+                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                  children=['Define budget amount:', html.Br(),
+                                            dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
+                         html.Div(id='modal-average-text', style={'padding': '5px 0 10px 0'}),
+                         html.Div(style={'float': 'right', 'position': 'absolute', 'bottom': 10, 'right': 10},
+                                  children=[dbc.Button(children=["Delete Budget ", html.I(className="fa-solid fa-trash-can")],
+                                                       id="modal-delete", color="danger", style={'float': 'right'})]),
+                         html.Div(id='modal-body-text'),
+                     ]),
+                     dbc.ModalFooter([
+                         html.Div(style={'float': 'left'}, children=[dbc.Button("Cancel", id="modal-cancel", className="ms-auto")]),
+                         dbc.Button(children=["Submit ", html.I(className="fa-solid fa-right-to-bracket")],
+                                    id="modal-submit", className="ms-auto", style={'float': 'left'})]
+                     ),
+                 ]),
+
+                 html.Div(id='budget-equation', style={'display': 'inline-block', 'padding': '5px 10px', 'background-color': 'skyblue'}, children=[html.Table([
+                     html.Tr([html.Td('Income Budget: '), html.Td(' $ 1,234.00')]),
+                     html.Tr(style={'border-bottom': '1pt solid black'}, children=[html.Td('Spending Budget: '), html.Td('-$ 1,234.00')]),
+                     html.Tr([html.Td('Remaining: '), html.Td(' $ 0.00')])
+                 ])]),
+                 html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='bottom-space-1')
+             ]),
+    html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')
+])
 
 
 @callback(
@@ -179,7 +221,10 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
                 spent = 0
             else:
                 spent = transactions.amount.sum() / 6
-            avg_str = html.P([f"Monthly spending for '{budget_category}' over the past 6 months: ", html.Br(), f"$ {-spent:.2f}"])
+            if spent <= 0:
+                avg_str = html.P([f"Monthly spending for '{budget_category}' over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
+            else:
+                avg_str = html.P([f"Monthly income for '{budget_category}' over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
         is_open = True
         categories = get_categories_list()
 

@@ -5,7 +5,7 @@ import dash_bootstrap_components as dbc
 from configurations_sidebar import configurations_sidebar
 from trends_tab import trends_tab, make_trends_plot
 from transaction_tab import transaction_tab, make_table
-from budget_tab import budget_tab, make_budget_plot
+from budget_tab import budget_tab, make_budget_plots
 from net_worth_tab import net_worth_tab, make_net_worth_plot
 from configurations_tab import configurations_tab, make_accounts_table, make_categories_table
 from utils import zero_params_dict
@@ -59,7 +59,11 @@ app.layout = html.Div(
     Output('trends-graph', 'figure'),
     Output('transactions-table', 'rowData'),
     Output('transactions-table', 'columnDefs'),
-    Output('budget-graph', 'figure'),
+    Output('budget-graph-income', 'figure'),
+    Output('budget-graph-income', 'style'),
+    Output('budget-graph-spend', 'figure'),
+    Output('budget-graph-spend', 'style'),
+    Output('budget-equation', 'children'),
     Output('net-worth-graph', 'figure'),
     Output('accounts-table', 'rowData'),
     Output('accounts-table', 'columnDefs'),
@@ -86,35 +90,35 @@ def update_tab_data(current_params, which_tab, update_tab):
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
-        return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+        return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Transactions':
         tab_dict = make_table(current_params)
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Budget':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(current_params), make_net_worth_plot(zero_params_dict()), \
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], *make_budget_plots(current_params), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Net Worth':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(current_params), \
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(current_params), \
             acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
     elif which_tab == 'Configurations':
         tab_dict = make_table(zero_params_dict())
         acc_dict = make_accounts_table(True)
         cat_dict = make_categories_table(True)
-        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], make_budget_plot(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
+        return make_trends_plot(zero_params_dict()), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
             acc_dict['data'], acc_dict['columns'], cat_dict['data'], cat_dict['columns']
 
 
