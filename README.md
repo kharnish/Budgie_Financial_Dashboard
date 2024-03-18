@@ -9,12 +9,15 @@ Process your bank transactions to get an overview of your spending, categorize t
 
 # Getting Started
 There are two ways to use Budgie:
-1. Download the executable file to run from your command line
+1. [Download the executable file](https://1drv.ms/f/s!AmMd5hpZTnZ3hZEyNDFWxb45dM2M5Q?e=wP6Yvv) to run from your command line
 2. Clone the source code and run in your local Python environment
 
 There are also two ways to store your financial data:
 1. A set of CSV files
 2. A Mongo database
+
+Budgie is built on the default CSV transactions that come from your bank. The CSV files are uploaded to Budgie and 
+separated by account.
 
 Add a new account by selecting the "Add New Account..." option from the accounts drop down menu.
 Type your account name and instantiate that account by selecting a transaction CSV file from your bank to upload. 
@@ -29,7 +32,7 @@ in the CSV file and simply leave the "New account name" input empty when uploadi
 After the transactions are loaded, you can update their details in the "Transactions" tab either by double clicking on the data or by selecting one or multiple rows
 and updating with the "Edit" button.
 
-New transactions will attempt to be auto-categorized based on previous transactions with a similar description. 
+Budgie will attempt to auto-categorize new transactions based on previous transactions with a similar description. 
 
 Once you categorize the transactions, you can add a budget and see your current status for different categories in the "Budget" tab
 and use the filters on the Configurations sidebar to look for trends in your finances.
