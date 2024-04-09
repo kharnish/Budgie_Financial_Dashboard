@@ -27,7 +27,7 @@ def make_accounts_table(check_update=False):
     # Update the column format for each column
     for col in columns:
         if col['field'] == 'initial balance':
-            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['valueFormatter'] = {"function": "d3.format('($,.2f')(params.value)"}
             col['type'] = 'numericColumn'
             col['filter'] = 'agNumberColumnFilter'
             col['editable'] = True
@@ -89,7 +89,7 @@ acc_tab = make_accounts_table(True)
 cat_tab = make_categories_table(True)
 
 configurations_tab = dcc.Tab(label="Configurations", value='Configurations', children=[
-    html.Div(style={'width': '100%', 'height': '700px', 'padding': '5px', 'align': 'center'}, className='tab-body',
+    html.Div(style={'width': '100%', 'padding': '5px', 'align': 'center'}, className='tab-body',
              children=[
                  html.Div(style={'width': '40%', 'display': 'inline-block', 'padding': '5px 15px 5px 5px'},
                           children=[

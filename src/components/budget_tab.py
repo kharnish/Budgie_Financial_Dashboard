@@ -28,7 +28,7 @@ def make_budget_plots(conf_dict):
     # Calculate overall percent of budget for multiple months
     start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
     end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
-    display_delta = end_date - start_date
+    display_delta = max(end_date - start_date, timedelta(days=1))
     months = np.ceil(display_delta.days / 31)
 
     fig_income = go.Figure()

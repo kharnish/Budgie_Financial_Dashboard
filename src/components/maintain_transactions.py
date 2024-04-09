@@ -40,8 +40,10 @@ class MaintainDatabase:
         """Import transaction CSV and write many transactions to database"""
         transaction_list = self._add_transactions(sheet, account)
 
-        # Insert transactions into database
-        if len(transaction_list) > 0:
+        # Insert transactions into database, unless there was an error, then just return the error string
+        if isinstance(transaction_list, str):
+            return transaction_list
+        elif len(transaction_list) > 0:
             self.transactions_table.insert_many(transaction_list)
         return len(transaction_list)
 
@@ -96,10 +98,13 @@ class MaintainDatabase:
                     new_vals.append(-vals[i])
             df['amount'] = new_vals
         elif isinstance(df.loc[0]['amount'], str):
-            df['amount'] = [''.join(val.split('$')) for val in df['amount']]
+            df['amount'] = [''.join(val.split('$')).replace('(', '-').replace(')', '').replace(',', '') for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
         if 'original description' not in df.columns:
-            df['original description'] = df['description']
+            try:
+                df['original description'] = df['description']
+            except KeyError:
+                return 'Error: Must provide "description" column in the CSV'
         account_labels = True if 'account name' in df.columns else False
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
@@ -347,6 +352,7 @@ class MaintainDatabase:
         """Save database data to CSV files"""
         load_dotenv()
         root = os.getenv('BACKUP_DIR') if root is None else root
+        os.makedirs(root, exist_ok=True)
         for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
