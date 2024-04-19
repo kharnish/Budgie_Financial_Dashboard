@@ -41,6 +41,12 @@ h6 { font-size: 2.0rem; line-height: 1.6;  letter-spacing: 0; margin-bottom: 0.7
 p {
   margin-top: 0; }
 
+/* Calendar
+–––––––––––––––––––––––––––––––––––––––––––––––––– */
+td.CalendarDay {
+  padding: 0;
+}
+
 /* Buttons
 –––––––––––––––––––––––––––––––––––––––––––––––––– */
 .button,
