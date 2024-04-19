@@ -20,7 +20,7 @@ Budgie is built on the default CSV transactions that come from your bank. The CS
 separated by account.
 
 Add a new account by selecting the "Add New Account..." option from the accounts drop down menu.
-Type your account name and instantiate that account by selecting a transaction CSV file from your bank to upload. 
+Type the account name and instantiate that account by selecting a transaction CSV file from your financial institution to upload. 
 Once the account is logged in your database, you can upload more transactions CSV files under that account. 
 You can select multiple files to upload simultaneously for the same account.
 
@@ -55,18 +55,18 @@ Start the Dash app with `python app()` and then access the app at http://127.0.0
 
 ## Storing Data
 ### CSV File
-If you are using the executable version of the program, a new folder called `data` to store the files will be created in the same location as the executable.
+If you are using the executable version of the program, a new folder called `data` will be created to store the files in the same location as the executable.
 
-Alternatively, you can specify a path with an `.env` file in the same location as the executable or at the top level of the repository that simply contains:
+Alternatively, you can specify a path with an `.env` file in the same directory as the executable, or at the top level of the repository, which contains:
     
     DATA_DIR=C:\path\to\data\directory
 
 When you add new transactions or update your budget, Budgie will automatically rewrite the CSV with the new data. 
-You can also click the "Export Data" button on bottom left to manually export your data.
+You can also click the "Export Data" button on bottom left of the Budgie app to manually export your data.
 
 
 ### Mongo Database
-Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template
+Instantiate a Mongo database and store the information in a `.env` file in the top level of this repository following the template:
     
     MONGO_HOST=mongodb://127.0.0.0:27017/
     MONGO_DB=your_database_name
@@ -74,7 +74,8 @@ Instantiate a Mongo database and store the information in a `.env` file in the t
 
 Start the Dash app with `python app()` and then access the app at http://127.0.0.1:8050/.
 
-You can export the database data as CSV files by clicking the "Export Data" button on bottom left to manually export your data to the root directory of the repository.
+You can export the database data as CSV files by clicking the "Export Data" button on bottom left of the Budgie app to manually export your data to the specified `BACKUP_DIR` 
+location or the default location, the root directory of the repository.
 
 
 
@@ -99,7 +100,7 @@ and [Miniconda](https://docs.anaconda.com/free/miniconda/).
     `Control Panel > System & Security > System > Advanced System Settings > Environment Variables`
 
     Edit the `Path` User Variable by adding a new variable of the path to your MongoDB bin file (making sure it ends with a `\ `),
-    so it should be close to: `C:\Program Files\MongoDB\Server\7.0\bin\ `
+    so it should be along the lines of: `C:\Program Files\MongoDB\Server\7.0\bin\ `
     
 3. Create a new directory for your data `C:\data\db`
 
@@ -108,24 +109,24 @@ and [Miniconda](https://docs.anaconda.com/free/miniconda/).
 5. In a second command prompt, run the command `mongosh` to start the database shell. Here, you can manipulate the database if you're a command line warrior. Also, 
 don't worry about closing the command prompts when you're done, Mongo saves all the data.
 
-6. Now, you can run `app.py` and start using Budgie by uploading a transaction CSV file to a new account
+6. Now, you can run `app.py` or the executable file and start using Budgie by uploading a transaction CSV file to a new account
 
 
 ## Security
-All transaction data is stored locally in your MongoDB. 
+All transaction data is stored locally on your machine as CSV files or on your MongoDB instance. 
 
-It should go without saying, but please do not commit any personal information into the repository.
+Please ensure you do not push any personal information into the repository.
 
 
 ## Troubleshooting
 
 ### CSV file upload fails
-If your bank's CSV fails to be uploaded, make an issue that includes the header of the CSV and a line of a representative credit (+) and debit (-) to the account.
+If your financial institution's CSV fails to be uploaded, make an issue that includes the header of the CSV and a line of a representative credit (+) and debit (-) to the account.
 
 ### Special note about Venmo
 Venmo allows you to spend either from your Venmo account balance, or from a third party account. To denote when these transactions are from an alternative source, it should be marked in the 
 transaction notes as "Source: [source information]" in order to properly calculate your net worth. 
 
 ### Slow performance
-I've only run the CSV file option with a couple thousand transactions (for me, a handful of years of transactions). Substantially larger amounts of data may experience slower performance,
+I've only run the CSV file option with a couple thousand transactions (for me, about a handful of years worth transactions). Substantially larger amounts of data may experience slower performance,
 and if so, please make an issue for it so I can address that.

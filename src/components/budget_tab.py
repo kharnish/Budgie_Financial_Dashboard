@@ -1,5 +1,5 @@
 import dash
-from dash import callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update, dash_table
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
 import numpy as np
@@ -28,7 +28,7 @@ def make_budget_plots(conf_dict):
     # Calculate overall percent of budget for multiple months
     start_date = datetime.strptime(conf_dict['start_date'], '%Y-%m-%d').date()
     end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
-    display_delta = end_date - start_date
+    display_delta = max(end_date - start_date, timedelta(days=1))
     months = np.ceil(display_delta.days / 31)
 
     fig_income = go.Figure()
@@ -91,16 +91,41 @@ def make_budget_plots(conf_dict):
     spend_height = m * len(neg_dict) + b
     spend_style = {'height': f"{spend_height if len(neg_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
 
+    # Calculate the budget overview table, starting with the sum of the budget
     pos_dict, neg_dict = MD.get_budget_dict()
-    sum_income = sum([v for k, v in pos_dict.items()])
-    sum_spend = sum([v for k, v in neg_dict.items()])
-    delta = sum_income + sum_spend
+    est_income = sum([v for k, v in pos_dict.items()])
+    est_spend = sum([v for k, v in neg_dict.items()])
+    est_delta = est_income + est_spend
+    if est_delta < 0:
+        est_color = 'firebrick'
+    else:
+        est_color = '#162432'
 
+    # Now get the actual current status
+    transactions = transactions[~transactions['category'].isin(MD.get_hide_from_trends())]
+    act_income = transactions['amount'][transactions['amount'] > 0].sum()
+    act_spend = transactions['amount'][transactions['amount'] < 0].sum()
+    act_delta = act_income + act_spend
+    if act_delta < 0:
+        act_color = 'firebrick'
+    else:
+        act_color = '#162432'
+
+    # Lastly, write out the actual table
     equation = [html.Table([
-                     html.Tr([html.Td('Income Budget: '), html.Td(f"$ {sum_income:,.2f}")]),
-                     html.Tr(style={'border-bottom': '1pt solid black'}, children=[html.Td('Spending Budget: '), html.Td(f"$ {sum_spend:,.2f}")]),
-                     html.Tr([html.Td('Remaining: '), html.Td(f"$ {delta:,.2f}")])
-                 ])]
+        html.Tr(style={'textAlign': 'center', 'fontWeight': 'bold', 'text-decoration': 'underline', 'padding-bottom': '5px'},
+                children=[html.Td(''), html.Td('Actual'), html.Td('Budgeted')]),
+        html.Tr([html.Td('Income'),
+                 html.Td(style={'textAlign': 'right', 'fontWeight': 'bold'}, children=[f"$ {act_income:,.2f}"]),
+                 html.Td(style={'textAlign': 'right'}, children=[f"$ {est_income:,.2f}"])]),
+        html.Tr(style={'border-bottom': '1pt solid black'},
+                children=[html.Td('Spending'),
+                          html.Td(style={'textAlign': 'right', 'fontWeight': 'bold'}, children=[f"$ {act_spend:,.2f}"]),
+                          html.Td(style={'textAlign': 'right'}, children=[f"$ {est_spend:,.2f}"])]),
+        html.Tr([html.Td('Remaining'),
+                 html.Td(style={'textAlign': 'right', 'fontWeight': 'bold', 'color': act_color}, children=[f"$ {act_delta:,.2f}"]),
+                 html.Td(style={'textAlign': 'right', 'color': est_color}, children=[f"$ {est_delta:,.2f}"])])
+    ])]
 
     return fig_income, income_style, fig_spend, spend_style, equation
 
@@ -116,19 +141,38 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                      dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
                      dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
                                              'Set a new category budget or update an exising budget with the Add or Update Budget button.', html.Br(), html.Br(),
-                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(), html.Br(),
+                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(),
+                                             html.Br(),
                                              'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.'])]),
 
-                 html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Income'])]),
+                 html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left'},
+                          children=[dbc.Button(id='new-budget-button', style={'width': '200px'},
+                                               children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
+
+                 html.Div(style={'display': 'inline-block', 'padding': '10px'}, children=[
+                     html.Div(id='budget-equation', style={'display': 'inline-block', 'padding': '5px 10px', 'background-color': '#dfe3ea'},
+                              children=[html.Table([html.Table([
+                                  html.Tr(style={'textAlign': 'center', 'fontWeight': 'bold', 'text-decoration': 'underline', 'padding-bottom': '5px'},
+                                          children=[html.Td(''), html.Td('Actual'), html.Td('Budgeted')]),
+                                  html.Tr([html.Td('Income'),
+                                           html.Td(style={'textAlign': 'right', 'fontWeight': 'bold'}, children=[f"$ {1234:,.2f}"]),
+                                           html.Td(style={'textAlign': 'right'}, children=[f"$ {1234:,.2f}"])]),
+                                  html.Tr(style={'border-bottom': '1pt solid black'},
+                                          children=[html.Td('Spending'),
+                                                    html.Td(style={'textAlign': 'right', 'fontWeight': 'bold'}, children=[f"$ {-1234:,.2f}"]),
+                                                    html.Td(style={'textAlign': 'right'}, children=[f"$ {-1234:,.2f}"])]),
+                                  html.Tr([html.Td('Remaining'),
+                                           html.Td(style={'textAlign': 'right', 'fontWeight': 'bold'}, children=[f"$ {0:,.2f}"]),
+                                           html.Td(style={'textAlign': 'right'}, children=[f"$ {0:,.2f}"])])
+                              ])])])
+                 ]),
+
+                 html.Div(style={'padding': '0 0 0 40px'}, children=[html.H4(['Income'])]),
                  dcc.Graph(style=initial_plots[1], id='budget-graph-income', figure=initial_plots[0]),
                  html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Spending'])]),
                  dcc.Graph(style=initial_plots[3], id='budget-graph-spend', figure=initial_plots[2]),
 
                  html.Div(style={'height': '5px', 'width': '99%', 'float': 'left'}, id='blank-space-4'),
-
-                 html.Div(style={'display': 'inline-block', 'padding': '0 40px 20px 20px', 'float': 'left'},
-                          children=[html.Button(id='new-budget-button', style={'width': 'auto'},
-                                                children=['Add Or Update Budget ', html.I(className="fa-solid fa-pen-to-square")])]),
 
                  dbc.Modal(id="budget-modal", is_open=False, children=[
                      dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
@@ -154,11 +198,6 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                      ),
                  ]),
 
-                 html.Div(id='budget-equation', style={'display': 'inline-block', 'padding': '5px 10px', 'background-color': 'skyblue'}, children=[html.Table([
-                     html.Tr([html.Td('Income Budget: '), html.Td(' $ 1,234.00')]),
-                     html.Tr(style={'border-bottom': '1pt solid black'}, children=[html.Td('Spending Budget: '), html.Td('-$ 1,234.00')]),
-                     html.Tr([html.Td('Remaining: '), html.Td(' $ 0.00')])
-                 ])]),
                  html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='bottom-space-1')
              ]),
     html.Div(style={'height': '8px', 'width': '75%', 'float': 'left'}, id='blank-space-3')

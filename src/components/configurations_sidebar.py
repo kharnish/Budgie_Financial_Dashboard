@@ -28,7 +28,7 @@ configurations_sidebar = html.Div(
                  ]),
         dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Select Filter']),
-                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 1px 0',
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
@@ -43,7 +43,7 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
                                                  clearable=False, searchable=False, className='dropdown',
-                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'This Year', 'Last Year',
+                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'This Year', 'Last Year',
                                                           'All Time', 'Custom'],
                                                  )
                                     ],
@@ -84,7 +84,7 @@ configurations_sidebar = html.Div(
                      ),
             html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
                      children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
-                                         placeholder='New account name')], ),
+                                         placeholder='New account name...')], ),
             html.Div(style={'display': 'inline-block'},
                      children=[dcc.Upload(id='upload-data', multiple=True, style={'display': 'inline-block', 'padding': '5px 20px 20px 12px'},
                                           children=[html.Button('Select Transaction CSV')])]),
@@ -213,6 +213,10 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
         elif time_filter == 'Last 3 Months':
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1) - relativedelta(months=3)
+            date_range_style = {'display': 'none'}
+        elif time_filter == 'Last 6 Months':
+            new_params['end_date'] = date.today()
+            new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1) - relativedelta(months=6)
             date_range_style = {'display': 'none'}
         elif time_filter == 'This Year':
             new_params['end_date'] = date.today()
@@ -354,6 +358,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
     Output('upload-message', 'children'),
     Output('upload-data', 'disabled'),
     Output('account-input', 'style'),
+    Output('account-input', 'value'),
     Output('account-dropdown', 'options'),
     Output('account-dropdown', 'value'),
     Output('update-tab', 'data'),
@@ -377,16 +382,25 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
     msg = ''
     account_input = {'display': 'none'}
     update_tab = no_update
+    account_dropdown_value = account
 
     trigger = dash.callback_context.triggered[0]['prop_id']
+
+    # First, trigger the new account text input and/or upload button to activate
     if trigger == 'account-dropdown.value':
         if account == 'Add new account...':
             account_input = {'display': 'inline-block', 'width': '100%'}
         elif account is not None:
             upload_button = False
+
+    # Once data is uploaded, process it
     elif trigger == 'upload-data.contents':
+
+        # If it's a new account name, note that
         if account == 'Add new account...':
             account = new_account
+
+        # Parse the data
         msg = []
         for i, file in enumerate(loaded_file):
             decodedBytes = base64.b64decode(file.split(',')[-1])
@@ -400,10 +414,8 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
 
             try:
                 results = MD.load_transactions(m, account)
-                account = None
-                if new_account:
-                    MD.add_account(new_account)
-                    MD.export_data_to_csv()
+
+                # If the results were successful, reset the upload center and update the tab
                 if isinstance(results, int):
                     if results == 0:
                         msg.append(f"File {i + 1}: No new transactions to upload")
@@ -412,19 +424,32 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                         msg.append(f"File {i + 1}: Successfully uploaded {results} new transactions\n")
                         msg.append(html.Br())
                         update_tab = True
+                        if new_account:
+                            MD.add_account(new_account)
+                            MD.export_data_to_csv()
+                            new_account = None
+                    account_dropdown_value = None
                 else:
+                    # Give a second chance to upload the file
                     msg.append(f"File {i + 1}: {results}\n")
                     msg.append(html.Br())
+                    if account_dropdown_value == 'Add new account...':
+                        account_input = {'display': 'inline-block', 'width': '100%'}
+                    upload_button = False
 
             except Exception as e:
+                # Give a second chance to upload the file
                 msg.append(f"File {i + 1} Error: Could not parse transactions")
                 msg.append(html.Br())
+                if account_dropdown_value == 'Add new account...':
+                    account_input = {'display': 'inline-block', 'width': '100%'}
+                upload_button = False
 
     elif trigger == 'account-input.value':
         account_input = {'display': 'inline-block', 'width': '100%'}
         upload_button = False
 
-    return msg, upload_button, account_input, get_accounts_list('new'), account, update_tab
+    return msg, upload_button, account_input, new_account, get_accounts_list('new'), account_dropdown_value, update_tab
 
 
 @callback(

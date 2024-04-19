@@ -83,16 +83,16 @@ def make_net_worth_plot(conf_dict):
         val_df = pd.DataFrame(val_dict)
         val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
         recent_worth = val_df.iloc[0]
-        recent_worth = recent_worth.sort_values(ascending=False)
+        recent_pos = recent_worth[recent_worth >= 0].sort_values(ascending=False)
+        recent_neg = recent_worth[recent_worth < 0].sort_values(ascending=True)
 
         # Plot the account and overall net worth data
-        for acc in recent_worth.index:
-            if recent_worth[acc] < 0:
-                stackgroup = 'one'
-            else:
-                stackgroup = 'two'
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup=stackgroup,
-                                         hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
+        for acc in recent_neg.index:
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='one', meta=acc,
+                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+        for acc in recent_pos.index:
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='two', meta=acc,
+                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
 
         fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
                                      marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
@@ -100,6 +100,7 @@ def make_net_worth_plot(conf_dict):
 
         # Standard figure layout
         update_layout_axes(fig_obj)
+        fig_obj.update_yaxes(zerolinewidth=2)
         return fig_obj
 
 

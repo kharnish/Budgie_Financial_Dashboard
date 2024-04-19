@@ -10,12 +10,11 @@ import utils
 from utils import zero_params_dict, MD, update_layout_axes
 
 
-def make_trends_plot(conf_dict, initial=False):
+def make_trends_plot(conf_dict):
     """Make plot object from transactions broken into income and spending.
 
     Args:
         conf_dict: Dictionary of the configuration parameters
-        initial: If it's running the initial setup, used for determining the initial data display
 
     Returns: Plotly figure object
 
