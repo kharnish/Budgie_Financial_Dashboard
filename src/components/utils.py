@@ -102,20 +102,6 @@ def get_accounts_list(extra=''):
     return acc_list
 
 
-def get_categories_list(extra=''):
-    """Get list of all categories with an associated transaction
-
-    Parameter to add an additional "Add new category..." option
-    """
-    cat_list = []
-    if extra == 'new':
-        cat_list = list(MD.transactions_table.find().distinct('category'))
-        cat_list.extend(['Add new category...'])
-    else:
-        cat_list.extend(MD.transactions_table.find().distinct('category'))
-    return cat_list
-
-
 def get_color(i):
     """Get color for plotting from list of colors"""
     return PLOTLY_COLORS[i % len(PLOTLY_COLORS)]

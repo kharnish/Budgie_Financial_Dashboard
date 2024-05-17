@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 import pandas as pd
 
-from utils import MD, get_categories_list
+from utils import MD
 
 
 def make_accounts_table(check_update=False):
@@ -58,7 +58,7 @@ def make_categories_table(check_update=False):
 
     if check_update:
         # If you delete all items from a category, it needs to trigger to delete the name
-        current_cats = get_categories_list()
+        current_cats = MD.get_categories_list()
         refresh = False
         for cat, grp in categories.iterrows():
             if grp['category name'] not in current_cats:
@@ -68,7 +68,7 @@ def make_categories_table(check_update=False):
             categories = pd.DataFrame(MD.categories_table.find())
 
     categories.loc[:, '_id'] = [str(tid) for tid in categories['_id']]
-    categories = categories.loc[categories["category name"].str.lower().sort_values().index]
+    categories = categories.sort_values(['parent', 'category name'], key=lambda column: column.str.lower())
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -76,8 +76,8 @@ def make_categories_table(check_update=False):
     for col in columns:
         if col['field'] == '_id':
             col['hide'] = True
-        elif col['field'] == 'parent':
-            col['hide'] = True
+        # elif col['field'] == 'parent':
+        #     col['hide'] = True
         elif col['field'] == 'hidden':
             col['editable'] = True
 

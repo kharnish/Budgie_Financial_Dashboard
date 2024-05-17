@@ -8,7 +8,7 @@ from io import StringIO
 import os
 import pandas as pd
 
-from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
+from utils import zero_params_dict, get_accounts_list, MD
 
 configurations_sidebar = html.Div(
     id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
@@ -32,7 +32,7 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
-                                                 options=get_categories_list(),
+                                                 options=MD.get_categories_list(),
                                                  )
                                     ],
                           ),
@@ -246,7 +246,7 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     if new_params['field_filter'] == 'Account Name':
         filter_dropdown = get_accounts_list()
     else:
-        filter_dropdown = get_categories_list()
+        filter_dropdown = MD.get_categories_list()
 
     if trigger == 'filter-dropdown.value':
         new_params['filter_value'] = filter_values
@@ -351,7 +351,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
         new_account = None
         note = None
 
-    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, get_categories_list('new'), note, update_tab
+    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, MD.get_categories_list('new'), note, update_tab
 
 
 @callback(

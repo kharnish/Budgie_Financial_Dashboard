@@ -1,5 +1,6 @@
 from datetime import datetime
 from dotenv import load_dotenv
+import numpy as np
 import os
 import sys
 import pandas as pd
@@ -37,6 +38,13 @@ class BudgieDF(pd.DataFrame):
             vals_list = list(self[value].unique())
         except KeyError:
             vals_list = []
+
+        # Remove NANs to allow for sorting strings
+        try:
+            vals_list.remove(np.nan)
+        except ValueError:
+            pass
+
         return sorted(vals_list)
 
     def sort(self, by):
@@ -203,26 +211,69 @@ class MaintainCSV(MaintainDatabase):
         if len(existing) == 1:
             self.budget_table.loc[existing.index, 'value'] = value
         else:
+            parent = self.categories_table.find_one({'category name': category})
             self.budget_table = BudgieDF(pd.concat([self.budget_table, pd.DataFrame({'category': [category],
                                                                                      'value': [value],
+                                                                                     'is_parent': True if parent is None else None,
                                                                                      '_id': uuid.uuid4()})], ignore_index=True))
+        self.update_parent_budget(category)
         self.export_data_to_csv()
+
+    def update_parent_budget(self, category):
+        # Check if there's a parent budget, and if so, update it
+        try:
+            parent = self.categories_table.find({'category name': category}).iloc[0]['parent']
+            if self.get_budget_amount(parent) != 0:
+                new_group_value = self.get_budget_amount(self.get_children_categories_list(parent))
+                existing = self.budget_table[self.budget_table['category'] == parent]
+                self.budget_table.loc[existing.index, 'value'] = new_group_value
+        except IndexError:
+            pass
 
     def get_budget_dict(self):
         """Get dictionary of all positive and negative budget line items"""
         pos_dict = {}
         neg_dict = {}
+        grp_dict = {}
         for i, item in self.budget_table.find().iterrows():
+            try:
+                if item['is_parent']:
+                    grp_dict[item['category']] = item['value']
+                    continue
+            except KeyError:
+                pass
             if item['value'] > 0:
                 pos_dict[item['category']] = item['value']
             else:
                 neg_dict[item['category']] = item['value']
-        return pos_dict, neg_dict
+        return pos_dict, neg_dict, grp_dict
+
+    def get_budget_amount(self, category):
+        """
+
+        Args:
+            category (str, list): Single category or list of categories to get the budget value of
+
+        Returns:
+
+        """
+        if isinstance(category, str):
+            try:
+                return self.budget_table.find({'category': category}).iloc[0]['value']
+            except IndexError:
+                return 0
+        elif isinstance(category, list):
+            budget_value = 0
+            for child_cat in category:
+                # Get the total budgeted amount for all child categories
+                budget_value += self.get_budget_amount(child_cat)
+            return budget_value
 
     def rm_budget_item(self, category, value):
         """Delete budget item in dataframe"""
         rm_i = self.budget_table[(self.budget_table['category'] == category) & (self.budget_table['value'] == value)].index
         self.budget_table = BudgieDF(self.budget_table.drop(rm_i))
+        self.update_parent_budget(category)
         self.export_data_to_csv()
 
     """====== Account ======"""

@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date
 
-from utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
+from utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_accounts_list
 
 
 def make_table(conf_dict):
@@ -27,7 +27,7 @@ def make_table(conf_dict):
         if col['field'] in EXCLUDE_FROM_TABLE:
             col['hide'] = True
         elif col['field'] == 'amount':
-            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['valueFormatter'] = {"function": "d3.format('($,.2f')(params.value)"}
             col['type'] = 'numericColumn'
             col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
             col['filter'] = 'agNumberColumnFilter'
@@ -36,7 +36,7 @@ def make_table(conf_dict):
             col['width'] = 150
             col['editable'] = True
             col['cellEditor'] = 'agSelectCellEditor'
-            col['cellEditorParams'] = {'values': get_categories_list()}
+            col['cellEditorParams'] = {'values': MD.get_categories_list()}
         elif col['field'] == 'description':
             col['width'] = 400
             col['editable'] = True
@@ -268,7 +268,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         new_account = None
         new_note = None
 
-    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, \
+    return enabled, enabled, is_open, category, cat_style, new_category, MD.get_categories_list('new'), amount, t_date, description, account, \
         account_style, new_account, msg_str, new_note, update_tab
 
 

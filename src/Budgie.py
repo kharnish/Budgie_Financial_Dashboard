@@ -61,6 +61,8 @@ app.layout = html.Div(
     Output('transactions-table', 'columnDefs'),
     Output('budget-graph-income', 'figure'),
     Output('budget-graph-income', 'style'),
+    Output('budget-graph-group', 'figure'),
+    Output('budget-graph-group', 'style'),
     Output('budget-graph-spend', 'figure'),
     Output('budget-graph-spend', 'style'),
     Output('budget-equation', 'children'),

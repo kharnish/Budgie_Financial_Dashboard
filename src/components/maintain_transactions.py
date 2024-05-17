@@ -286,20 +286,53 @@ class MaintainDatabase:
         """Add new budget item in database with category and monthly value"""
         existing = list(self.budget_table.find({'category': category}))
         if len(existing) == 1:
-            return self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
+            self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
         else:
-            return self.budget_table.insert_one({'category': category, 'value': value})
+            parent = self.categories_table.find_one({'category name': category})
+            self.budget_table.insert_one({'category': category, 'value': value, 'is_parent': True if parent is None else None})
+        self.update_parent_budget(category)
+
+    def update_parent_budget(self, category):
+        # Check if there's a parent budget, and if so, update it
+        try:
+            parent = self.categories_table.find_one({'category name': category})['parent']
+            if self.get_budget_amount(parent) != 0:
+                new_group_value = self.get_budget_amount(self.get_children_categories_list(parent))
+                existing = self.budget_table[self.budget_table['category'] == parent]
+                self.budget_table.loc[existing.index, 'value'] = new_group_value
+        except IndexError:
+            pass
 
     def get_budget_dict(self):
-        """Get dictionary of all positive and negative budget line items"""
+        """Get dictionary of all positive and negative budget line items, along with all grouped budgets"""
         pos_dict = {}
         neg_dict = {}
+        grp_dict = {}
         for item in self.budget_table.find():
+            try:
+                if item['is_parent']:
+                    grp_dict[item['category']] = item['value']
+                    continue
+            except KeyError:
+                pass
             if item['value'] > 0:
                 pos_dict[item['category']] = item['value']
             else:
                 neg_dict[item['category']] = item['value']
-        return pos_dict, neg_dict
+        return pos_dict, neg_dict, grp_dict
+
+    def get_budget_amount(self, category):
+        if isinstance(category, str):
+            try:
+                return list(self.budget_table.find({'category': category}))[0]['value']
+            except IndexError:
+                return 0
+        elif isinstance(category, list):
+            budget_value = 0
+            for child_cat in category:
+                # Get the total budgeted amount for all child categories
+                budget_value += self.get_budget_amount(child_cat)
+            return budget_value
 
     def rm_budget_item(self, category, value):
         """Delete budget item in database"""
@@ -335,6 +368,39 @@ class MaintainDatabase:
         old_dict = change_dict[0]['data'].copy()
         old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
         return self.categories_table.update_one(old_dict, {'$set': new_dict})
+
+    def get_categories_list(self, extra=''):
+        """Get list of all categories with an associated transaction
+
+        Parameter to add an additional "Add new category..." option
+        """
+        cat_list = []
+        if extra == 'new':
+            cat_list = list(self.transactions_table.find().distinct('category'))
+            cat_list.extend(['Add new category...'])
+        elif extra == 'parent':
+            cat_list = list(self.transactions_table.find().distinct('category'))
+            cat_list.extend(list(self.categories_table.find().distinct('parent')))
+            # Remove NANs to allow for sorting strings
+            try:
+                cat_list.remove(None)
+            except ValueError:
+                pass
+            cat_list = sorted(cat_list)
+        elif extra == 'parent_only':
+            cat_list = list(self.categories_table.find().distinct('parent'))
+            # Remove NANs to allow for sorting strings
+            try:
+                cat_list.remove(None)
+            except ValueError:
+                pass
+            cat_list = sorted(cat_list)
+        else:
+            cat_list.extend(self.transactions_table.find().distinct('category'))
+        return cat_list
+
+    def get_children_categories_list(self, parent=None):
+        return [item['category name'] for item in list(self.categories_table.find({'parent': parent}))]
 
     def get_hide_from_trends(self):
         """Get list of all categories hidden from trends"""

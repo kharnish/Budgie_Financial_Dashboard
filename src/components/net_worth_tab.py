@@ -5,7 +5,7 @@ from datetime import date, timedelta, datetime
 import pandas as pd
 import plotly.graph_objects as go
 
-from utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
+from utils import zero_params_dict, MD, update_layout_axes, get_accounts_list, get_color
 
 
 def make_net_worth_plot(conf_dict):
@@ -82,18 +82,21 @@ def make_net_worth_plot(conf_dict):
         # Convert account net worth data to dataframe to drop accounts that are closed and sort
         val_df = pd.DataFrame(val_dict)
         val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
+        # TODO update this to be the average of a couple points, not necessarily the current amount
         recent_worth = val_df.iloc[0]
         recent_pos = recent_worth[recent_worth >= 0].sort_values(ascending=False)
         recent_neg = recent_worth[recent_worth < 0].sort_values(ascending=True)
 
         # Plot the account and overall net worth data
+        # trace = 0
         for acc in recent_neg.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='one', meta=acc,
-                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  #fillcolor=get_color(trace),
+                                         stackgroup='one', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            # trace += 1
         for acc in recent_pos.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='two', meta=acc,
-                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
-
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  #fillcolor=get_color(trace),
+                                         stackgroup='two', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            # trace += 1
         fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
                                      marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
                                      hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
