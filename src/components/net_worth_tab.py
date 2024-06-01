@@ -82,10 +82,10 @@ def make_net_worth_plot(conf_dict):
         # Convert account net worth data to dataframe to drop accounts that are closed and sort
         val_df = pd.DataFrame(val_dict)
         val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
-        # TODO update this to be the average of a couple points, not necessarily the current amount
         recent_worth = val_df.iloc[0]
-        recent_pos = recent_worth[recent_worth >= 0].sort_values(ascending=False)
-        recent_neg = recent_worth[recent_worth < 0].sort_values(ascending=True)
+        average_worth = (val_df.iloc[0] + val_df.iloc[-1])/2
+        recent_pos = recent_worth[average_worth >= 0].sort_values(ascending=False)
+        recent_neg = recent_worth[average_worth < 0].sort_values(ascending=True)
 
         # Plot the account and overall net worth data
         # trace = 0
