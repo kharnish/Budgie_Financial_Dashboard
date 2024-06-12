@@ -168,14 +168,14 @@ class MaintainDatabase:
                                   f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             break
-                        else:
-                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
-                            if matches:
-                                break
-                            else:
-                                print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
-                                      f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
-                                break
+                        # else:
+                        #     matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
+                        #     if matches:
+                        #         break
+                        #     else:
+                        #         print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
+                        #               f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        #         break
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
