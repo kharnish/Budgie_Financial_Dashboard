@@ -26,10 +26,7 @@ You can select multiple files to upload simultaneously for the same account.
 
 You can also manually input transactions with the "Add Manual Transaction" menu.
 
-To load a transaction file which contains multiple accounts (i.e. transactions CSV from Mint), ensure there is an `account_name` column
-in the CSV file and simply leave the "New account name" input empty when uploading the file.
-
-After the transactions are loaded, you can update their details in the "Transactions" tab either by double clicking on the data or by selecting one or multiple rows
+After the transactions are loaded, you can update their details in the "Transactions" tab either by double-clicking on the data or by selecting one or multiple rows
 and updating with the "Edit" button.
 
 Budgie will attempt to auto-categorize new transactions based on previous transactions with a similar description. 

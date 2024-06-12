@@ -79,7 +79,7 @@ class MaintainDatabase:
         if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
             df = df.rename(columns={'transaction date': 'date'})
         else:
-            df = df.rename(columns={'posted date': 'date', 'booking date': 'date'})
+            df = df.rename(columns={'post date': 'date', 'posting date': 'date', 'posted date': 'date', 'booking date': 'date'})
         if 'original name' in df.columns:
             df = df.rename(columns={'payee': 'description', 'original name': 'original description'})
         else:
