@@ -48,7 +48,7 @@ def make_net_worth_plot(conf_dict):
         end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
         display_delta = end_date - start_date
         days = [end_date]
-        if display_delta < timedelta(days=32):
+        if display_delta < timedelta(days=40):
             iter_delta = timedelta(days=1)
         elif display_delta < timedelta(days=365):
             iter_delta = timedelta(days=7)
