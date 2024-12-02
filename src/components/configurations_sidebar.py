@@ -8,7 +8,11 @@ from io import StringIO
 import os
 import pandas as pd
 
+<<<<<<< Updated upstream
 from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
+=======
+from components.utils import zero_params_dict, get_accounts_list, MD
+>>>>>>> Stashed changes
 
 configurations_sidebar = html.Div(
     id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs

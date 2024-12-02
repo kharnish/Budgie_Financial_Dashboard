@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 import os
 import sys
 
-from maintain_transactions import MaintainDatabase
-from maintain_transactions_csv import MaintainCSV
+from components.maintain_transactions import MaintainDatabase
+from components.maintain_transactions_csv import MaintainCSV
 
 EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
 

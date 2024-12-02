@@ -6,8 +6,8 @@ from dateutil.relativedelta import relativedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import utils
-from utils import zero_params_dict, MD, update_layout_axes
+import components.utils as utils
+from components.utils import zero_params_dict, MD, update_layout_axes
 
 
 def make_trends_plot(conf_dict):
