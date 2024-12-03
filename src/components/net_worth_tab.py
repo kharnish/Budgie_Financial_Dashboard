@@ -5,11 +5,7 @@ from datetime import date, timedelta, datetime
 import pandas as pd
 import plotly.graph_objects as go
 
-<<<<<<< Updated upstream
-from utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
-=======
-from components.utils import zero_params_dict, MD, update_layout_axes, get_accounts_list, get_color
->>>>>>> Stashed changes
+from components.utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
 
 
 def make_net_worth_plot(conf_dict):

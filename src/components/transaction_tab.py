@@ -4,11 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date
 
-<<<<<<< Updated upstream
-from utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
-=======
-from components.utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_accounts_list
->>>>>>> Stashed changes
+from components.utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
 
 
 def make_table(conf_dict):

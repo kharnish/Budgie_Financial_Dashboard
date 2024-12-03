@@ -4,11 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 import pandas as pd
 
-<<<<<<< Updated upstream
-from utils import MD, get_categories_list
-=======
-from components.utils import MD
->>>>>>> Stashed changes
+from components.utils import MD, get_categories_list
 
 
 def make_accounts_table(check_update=False):

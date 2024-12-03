@@ -8,11 +8,7 @@ from io import StringIO
 import os
 import pandas as pd
 
-<<<<<<< Updated upstream
-from utils import zero_params_dict, get_accounts_list, get_categories_list, MD
-=======
-from components.utils import zero_params_dict, get_accounts_list, MD
->>>>>>> Stashed changes
+from components.utils import zero_params_dict, get_accounts_list, get_categories_list, MD
 
 configurations_sidebar = html.Div(
     id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
@@ -20,7 +16,7 @@ configurations_sidebar = html.Div(
         dbc.Row([html.H4(style={'width': '100%', 'display': 'inline-block', 'padding': '10px 20px'},
                          children=["Configurations"]),
                  html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
-                          children=["Sort By"]),
+                          children=["Filter By"]),
                  html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='field-dropdown', value=zero_params_dict()['field_filter'],
@@ -32,15 +28,27 @@ configurations_sidebar = html.Div(
                  ]),
         dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Select Filter']),
-                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 1px 0',
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0',
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
                                                  options=get_categories_list(),
                                                  )
-                                    ],
+                                    ]
                           ),
                  ]),
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
+                          children=["Sort By"]),
+                html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                                'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
+                                                 clearable=False, searchable=False, className='dropdown',
+                                                 options=['Category', 'Account Name'],
+                                                 ),
+                                ]
+                          ),
+                ]),
+
         dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Time Window']),
                  html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
@@ -160,12 +168,14 @@ configurations_sidebar = html.Div(
     Output('current-config-memory', 'data'),
     Output('field-dropdown', 'value'),
     Output('time-dropdown', 'value'),
+    Output('sort-dropdown', 'value'),
     Output('filter-dropdown', 'options'),
     Output('date-range', 'style'),
 
     Input('field-dropdown', 'value'),
     Input('time-dropdown', 'value'),
     Input('filter-dropdown', 'value'),
+    Input('sort-dropdown', 'value'),
     Input('current-config-memory', 'data'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
@@ -173,7 +183,7 @@ configurations_sidebar = html.Div(
     Input('bar-button', 'n_clicks'),
     Input('time-button', 'n_clicks'),
 )
-def update_parameters(field_filter, time_filter, filter_values, curr_params, start_date, end_date, bar_button, pie_button, time_button):
+def update_parameters(field_filter, time_filter, filter_values, sort_filter, curr_params, start_date, end_date, bar_button, pie_button, time_button):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
@@ -239,6 +249,8 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
+    elif trigger == 'sort-dropdown.value':
+        new_params['sort_filter'] = sort_filter
 
     elif trigger == 'pie-button.n_clicks':
         curr_params['plot_type'] = 'pie'
@@ -255,7 +267,7 @@ def update_parameters(field_filter, time_filter, filter_values, curr_params, sta
     if trigger == 'filter-dropdown.value':
         new_params['filter_value'] = filter_values
 
-    return new_params, new_params['field_filter'], new_params['time_filter'], filter_dropdown, date_range_style
+    return new_params, new_params['field_filter'], new_params['time_filter'], new_params['sort_filter'], filter_dropdown, date_range_style
 
 
 @callback(
