@@ -27,7 +27,7 @@ def make_trends_plot(conf_dict):
         else:
             l_v = {'Spending': {'labels': [], 'values': []},
                    'Income': {'labels': [], 'values': []}}
-            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
+            for cat, grp in transactions.groupby(conf_dict['sort_filter'].lower()):
                 inc_amount = grp['amount'][grp['amount'] > 0].sum()
                 spd_amount = grp['amount'][grp['amount'] < 0].sum()
                 if spd_amount:
