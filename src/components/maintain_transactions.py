@@ -165,8 +165,8 @@ class MaintainDatabase:
                             if matches:
                                 break
                             else:
-                                print(f"Did not insert possible duplicate, but check different description: "
-                                      f"New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
+                                      f"New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}")
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction

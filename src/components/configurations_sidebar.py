@@ -422,7 +422,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
             decodedBytes = base64.b64decode(file.split(',')[-1])
             file_text = decodedBytes.decode("utf-8")
             try:
-                m = pd.read_csv(StringIO(file_text))
+                m = pd.read_csv(StringIO(file_text), index_col=False)
             except:
                 msg.append(f"File {i + 1}: File must be in CSV format\n")
                 msg.append(html.Br())

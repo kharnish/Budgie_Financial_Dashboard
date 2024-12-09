@@ -87,7 +87,11 @@ def update_tab_data(current_params, which_tab, update_tab):
 
     """
     if which_tab == 'Trends':
-        tab_dict = make_table(zero_params_dict())
+        try:
+            tab_dict = make_table(zero_params_dict())
+        except Exception as e:
+            print(e)
+            exit()
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
         return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
