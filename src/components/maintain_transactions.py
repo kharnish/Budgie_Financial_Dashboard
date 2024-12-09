@@ -76,15 +76,19 @@ class MaintainDatabase:
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
-        if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
+
+        if 'transaction date' in df.columns:  # Prefer to use 'transaction date' as opposed to 'posted date' if there's both
             df = df.rename(columns={'transaction date': 'date'})
         else:
             df = df.rename(columns={'post date': 'date', 'posting date': 'date', 'posted date': 'date', 'booking date': 'date'})
+
         if 'original name' in df.columns:
             df = df.rename(columns={'payee': 'description', 'original name': 'original description'})
         else:
             df = df.rename(columns={'payee': 'description'})
+
         df['date'] = pd.to_datetime(df['date'])
+
         if 'credit' in df.columns and 'debit' in df.columns:
             df['amount'] = df['credit'].fillna(-df['debit'])
         elif 'credit debit indicator' in df.columns:
@@ -100,14 +104,17 @@ class MaintainDatabase:
         elif isinstance(df.loc[0]['amount'], str):
             df['amount'] = [''.join(val.split('$')).replace('(', '-').replace(')', '').replace(',', '') for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
+
         if 'original description' not in df.columns:
             try:
                 df['original description'] = df['description']
             except KeyError:
                 return 'Error: Must provide "description" column in the CSV'
         account_labels = True if 'account name' in df.columns else False
+
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
+        
         if 'category' not in df.columns or account:
             df['category'] = ''
 
@@ -128,6 +135,7 @@ class MaintainDatabase:
 
         # Add all non-duplicate transactions to database
         transaction_list = []
+        now = datetime.now()
         for i, row in df.iterrows():
             if account_labels:
                 account = row['account name']
@@ -167,6 +175,8 @@ class MaintainDatabase:
                             print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} / "
                                   f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                            if row['date'] - now > timedelta(days=30):
+                                print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
                             break
                         else:
                             matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
@@ -179,6 +189,8 @@ class MaintainDatabase:
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                if row['date'] - now > timedelta(days=30):
+                    print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
 
         return transaction_list
 
