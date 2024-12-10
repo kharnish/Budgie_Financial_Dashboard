@@ -2,13 +2,13 @@ import dash
 from dash import dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 
-from configurations_sidebar import configurations_sidebar
-from trends_tab import trends_tab, make_trends_plot
-from transaction_tab import transaction_tab, make_table
-from budget_tab import budget_tab, make_budget_plots
-from net_worth_tab import net_worth_tab, make_net_worth_plot
-from configurations_tab import configurations_tab, make_accounts_table, make_categories_table
-from utils import zero_params_dict
+from components.configurations_sidebar import configurations_sidebar
+from components.trends_tab import trends_tab, make_trends_plot
+from components.transaction_tab import transaction_tab, make_table
+from components.budget_tab import budget_tab, make_budget_plots
+from components.net_worth_tab import net_worth_tab, make_net_worth_plot
+from components.configurations_tab import configurations_tab, make_accounts_table, make_categories_table
+from components.utils import zero_params_dict
 
 external_stylesheets = ['assets/budgie_light.css', dbc.themes.BOOTSTRAP, dbc.icons.FONT_AWESOME]
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -87,7 +87,11 @@ def update_tab_data(current_params, which_tab, update_tab):
 
     """
     if which_tab == 'Trends':
-        tab_dict = make_table(zero_params_dict())
+        try:
+            tab_dict = make_table(zero_params_dict())
+        except Exception as e:
+            print(e)
+            exit()
         acc_dict = make_accounts_table()
         cat_dict = make_categories_table()
         return make_trends_plot(current_params), tab_dict['data'], tab_dict['columns'], *make_budget_plots(zero_params_dict()), make_net_worth_plot(zero_params_dict()), \
