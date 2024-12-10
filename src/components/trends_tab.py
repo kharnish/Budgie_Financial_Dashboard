@@ -131,7 +131,7 @@ def make_trends_plot(conf_dict):
         for i in range(len(days) - 1):
             this_month = transactions[(transactions['date'].dt.date < days[i]) & (transactions['date'].dt.date >= days[i + 1])]
             net.append(this_month['amount'].sum())
-            for cat, grp in this_month.groupby('category'):
+            for cat, grp in this_month.groupby(conf_dict['sort_filter'].lower()):
                 try:
                     val_dict[cat]['date'].append(days[i + 1])
                     val_dict[cat]['amount'].append(grp['amount'].sum())
