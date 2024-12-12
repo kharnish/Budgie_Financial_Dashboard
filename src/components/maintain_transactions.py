@@ -327,11 +327,13 @@ class MaintainDatabase:
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
     def edit_account(self, change_dict):
-        """Update accounts based on edits in Accounts table"""
-        new_dict = change_dict[0]['data']
+        """Update accounts (and transactions, if applicable) based on edits in Accounts table"""
+        new_dict = change_dict['data']
         new_dict.pop('_id')
-        old_dict = change_dict[0]['data'].copy()
-        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        old_dict = change_dict['data'].copy()
+        old_dict[change_dict['colId']] = change_dict['oldValue']
+        if old_dict['account name'] != change_dict['data']['account name']:
+            self.transactions_table.update_many({'account name': old_dict['account name']}, {'$set': {'account name': new_dict['account name']}})
         return self.accounts_table.update_one(old_dict, {'$set': new_dict})
 
     def delete_account(self, row_data):

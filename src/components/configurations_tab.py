@@ -26,7 +26,7 @@ def make_accounts_table(check_update=False):
 
     # Update the column format for each column
     for col in columns:
-        if col['field'] == 'account name': 
+        if col['field'] == 'account name':
             col['editable'] = True
         elif col['field'] == 'initial balance':
             col['valueFormatter'] = {"function": "d3.format('($,.2f')(params.value)"}
@@ -116,7 +116,7 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                   dbc.ModalHeader(dbc.ModalTitle("Configuration Help")),
                                   dbc.ModalBody(children=['The Configurations tab shows all Categories and Accounts.', html.Br(), html.Br(),
                                                           "Categories can be marked as Hidden, which means those transactions won't be displayed on the Trends tab. "
-                                                          'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.', 
+                                                          'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.',
                                                           html.Br(), html.Br(),
                                                           'As described on the Net Worth tab, the Initial Balance of each account should be set so the calculations match your current assets. '
                                                           'It is equivalent to account balance before the date of the first transaction from that account in Budgie.', html.Br(), html.Br(),
@@ -197,9 +197,10 @@ def confirm_delete_account(value):
 
     Input('confirm-account-danger', 'submit_n_clicks'),
     Input('accounts-table', 'selectedRows'),
+    Input('accounts-table', 'cellValueChanged'),
     prevent_initial_call=True,
 )
-def update_accounts_table(confirm_delete, row_data):
+def update_accounts_table(confirm_delete, row_data, cell_data):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     disabled = True
@@ -213,17 +214,12 @@ def update_accounts_table(confirm_delete, row_data):
         print(f"Deleted account and all associated transactions for: {row_data[0]['account name']}")
         update_tab = True
 
+    elif trigger == 'accounts-table.cellValueChanged':
+        MD.edit_account(cell_data[0])
+        print(f"Updated account name: '{cell_data[0]['oldValue']}' -> '{cell_data[0]['data']['account name']}'")
+        update_tab = True
+
     return disabled, update_tab
-
-
-@callback(
-    Output('blank-space-2', 'children'),
-    Input('accounts-table', 'cellValueChanged')
-)
-def update_table_data2(change_data):
-    if change_data:
-        MD.edit_account(change_data)
-    return ''
 
 
 @callback(
