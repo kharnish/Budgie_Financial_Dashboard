@@ -26,7 +26,9 @@ def make_accounts_table(check_update=False):
 
     # Update the column format for each column
     for col in columns:
-        if col['field'] == 'initial balance':
+        if col['field'] == 'account name': 
+            col['editable'] = True
+        elif col['field'] == 'initial balance':
             col['valueFormatter'] = {"function": "d3.format('($,.2f')(params.value)"}
             col['type'] = 'numericColumn'
             col['filter'] = 'agNumberColumnFilter'
@@ -94,8 +96,8 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                  html.Div(style={'width': '40%', 'display': 'inline-block', 'padding': '5px 15px 5px 5px'},
                           children=[
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
-                                       children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
-                                                            style={'display': 'none'},  # {'width': '100px'},
+                                       children=[dbc.Button(children=["Delete Category ", html.I(className="fa-solid fa-trash-can")],
+                                                            style={'width': '160px'},
                                                             id="categories-delete", disabled=True, color="danger")]),
                               dag.AgGrid(id="categories-table",
                                          style={"height": '600px'},
@@ -114,15 +116,20 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                   dbc.ModalHeader(dbc.ModalTitle("Configuration Help")),
                                   dbc.ModalBody(children=['The Configurations tab shows all Categories and Accounts.', html.Br(), html.Br(),
                                                           "Categories can be marked as Hidden, which means those transactions won't be displayed on the Trends tab. "
-                                                          'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.', html.Br(), html.Br(),
+                                                          'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.', 
+                                                          html.Br(), html.Br(),
                                                           'As described on the Net Worth tab, the Initial Balance of each account should be set so the calculations match your current assets. '
                                                           'It is equivalent to account balance before the date of the first transaction from that account in Budgie.', html.Br(), html.Br(),
                                                           'Account status can also be changed to Open or Closed for your record.'])]),
 
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
-                                       children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
-                                                            style={'display': 'none'},  # {'width': '100px'},
+                                       children=[dbc.Button(children=["Delete Account ", html.I(className="fa-solid fa-trash-can")],
+                                                            style={'width': '150px'},
                                                             id="accounts-delete", disabled=True, color="danger")]),
+                              dcc.ConfirmDialog(
+                                    id='confirm-account-danger',
+                                    message='WARNING! \n\nYou are about to delete an account. All associated transactions will also be deleted. \n\nDo you want to continue?',
+                              ),
                               dag.AgGrid(id="accounts-table",
                                          dashGridOptions={"domLayout": "autoHeight", "rowSelection": "multiple"},
                                          rowData=acc_tab['data'],
@@ -175,35 +182,45 @@ def update_categories_table(delete, row_data):
     return enabled, update_tab
 
 
+@callback(Output('confirm-account-danger', 'displayed'),
+          Input('accounts-delete', 'n_clicks'),
+          )
+def confirm_delete_account(value):
+    if value:
+        return True
+    return False
+
+
 @callback(
     Output('accounts-delete', 'disabled'),
     Output('update-tab', 'data', allow_duplicate=True),
 
-    Input('accounts-delete', 'n_clicks'),
+    Input('confirm-account-danger', 'submit_n_clicks'),
     Input('accounts-table', 'selectedRows'),
     prevent_initial_call=True,
 )
-def update_accounts_table(delete, row_data):
+def update_accounts_table(confirm_delete, row_data):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
-    enabled = True
+    disabled = True
     update_tab = no_update
 
     if trigger == 'accounts-table.selectedRows' and (row_data is None or len(row_data) > 0):
-        enabled = False
+        disabled = False
 
-    elif trigger == 'accounts-delete.n_clicks':
-        MD.delete_category(row_data)
+    elif trigger == 'confirm-account-danger.submit_n_clicks' and confirm_delete:
+        MD.delete_account(row_data[0])
+        print(f"Deleted account and all associated transactions for: {row_data[0]['account name']}")
         update_tab = True
 
-    return enabled, update_tab
+    return disabled, update_tab
 
 
 @callback(
     Output('blank-space-2', 'children'),
     Input('accounts-table', 'cellValueChanged')
 )
-def update_table_data(change_data):
+def update_table_data2(change_data):
     if change_data:
         MD.edit_account(change_data)
     return ''

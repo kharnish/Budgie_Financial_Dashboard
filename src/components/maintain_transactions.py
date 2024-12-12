@@ -114,7 +114,7 @@ class MaintainDatabase:
 
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
-        
+
         if 'category' not in df.columns or account:
             df['category'] = ''
 
@@ -166,14 +166,14 @@ class MaintainDatabase:
                                 break
                             else:
                                 print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
-                                      f"New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}")
+                                      f"    New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}")
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
                         if abs((dup['date'] - row['date'])) > timedelta(days=7):
-                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} / "
-                                  f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} \n "
+                                  f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             if row['date'] - now > timedelta(days=30):
                                 print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
@@ -184,7 +184,7 @@ class MaintainDatabase:
                                 break
                             else:
                                 print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
-                                      f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                      f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                                 break
             else:
                 # There's no match, so get the category and add the transaction
@@ -290,7 +290,11 @@ class MaintainDatabase:
         """Delete a list of transactions from the Transactions table"""
         for trans in transaction_dict:
             trans.pop('_id')
-            trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+            try:
+                trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+            except TypeError:
+                # The date is already a datetime object
+                pass
             self.transactions_table.delete_one(trans)
 
     """====== Budget ======"""
@@ -331,7 +335,10 @@ class MaintainDatabase:
         return self.accounts_table.update_one(old_dict, {'$set': new_dict})
 
     def delete_account(self, row_data):
-        """Delete account in database"""
+        """Delete account in database and all associated transactions"""
+        rm_t = self.transactions_table.find({'account name': row_data['account name']})
+        self.delete_transaction(rm_t)
+        row_data.pop('_id')
         return self.accounts_table.delete_one(row_data)
 
     """====== Category ======"""
