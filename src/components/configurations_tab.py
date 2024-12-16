@@ -62,9 +62,10 @@ def make_categories_table(check_update=False):
         # If you delete all items from a category, it needs to trigger to delete the name
         current_cats = get_categories_list()
         refresh = False
-        for cat, grp in categories.iterrows():
+        for _, grp in categories.iterrows():
             if grp['category name'] not in current_cats:
-                MD.delete_category([grp.to_dict()])
+                for delete_cat in [grp.to_dict()]:
+                    MD.delete_category(delete_cat)
                 refresh = True
         if refresh:
             categories = pd.DataFrame(MD.categories_table.find())
@@ -78,6 +79,8 @@ def make_categories_table(check_update=False):
     for col in columns:
         if col['field'] == '_id':
             col['hide'] = True
+        elif col['field'] == 'category name':
+            col['editable'] = True
         elif col['field'] == 'parent':
             col['hide'] = True
         elif col['field'] == 'hidden':
@@ -98,7 +101,11 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                               html.Div(style={'padding': '10px', 'display': 'inline-block'},
                                        children=[dbc.Button(children=["Delete Category ", html.I(className="fa-solid fa-trash-can")],
                                                             style={'width': '160px'},
-                                                            id="categories-delete", disabled=True, color="danger")]),
+                                                            id="category-delete", disabled=True, color="danger")]),
+                              dcc.ConfirmDialog(
+                                    id='confirm-category-danger',
+                                    message='WARNING! \n\nYou are about to delete a category. All associated transactions will be reverted to "unknown" category. \n\nDo you want to continue?',
+                              ),
                               dag.AgGrid(id="categories-table",
                                          style={"height": '600px'},
                                          dashGridOptions={"rowSelection": "multiple"},
@@ -142,44 +149,61 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
 ])
 
 
+# @callback(
+#     Output('update-tab', 'data', allow_duplicate=True),
+#     Input('categories-table', 'cellValueChanged'),
+#     prevent_initial_call=True,
+# )
+# def update_table_data(change_data):
+#     update_tab = no_update
+#     if change_data:
+#         if change_data[0]['colId'] == 'parent':
+#             if change_data[0]['data']['parent'] == 'Make parent':
+#                 change_data[0]['data']['parent'] = None
+#         MD.edit_category(change_data)
+#         update_tab = True
+#     return update_tab
+
+
+@callback(Output('confirm-category-danger', 'displayed'),
+          Input('category-delete', 'n_clicks'),
+          )
+def confirm_category_account(value):
+    if value:
+        return True
+    return False
+
+
 @callback(
+    Output('category-delete', 'disabled'),
     Output('update-tab', 'data', allow_duplicate=True),
+
+    Input('confirm-category-danger', 'submit_n_clicks'),
+    Input('categories-table', 'selectedRows'),
     Input('categories-table', 'cellValueChanged'),
     prevent_initial_call=True,
 )
-def update_table_data(change_data):
-    update_tab = no_update
-    if change_data:
-        if change_data[0]['colId'] == 'parent':
-            if change_data[0]['data']['parent'] == 'Make parent':
-                change_data[0]['data']['parent'] = None
-        MD.edit_category(change_data)
-        update_tab = True
-    return update_tab
-
-
-@callback(
-    Output('categories-delete', 'disabled'),
-    Output('update-tab', 'data', allow_duplicate=True),
-
-    Input('categories-delete', 'n_clicks'),
-    Input('categories-table', 'selectedRows'),
-    prevent_initial_call=True,
-)
-def update_categories_table(delete, row_data):
+def update_categories_table(confirm_delete, row_data, cell_data):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
-    enabled = True
+    disabled = True
     update_tab = no_update
 
     if trigger == 'categories-table.selectedRows' and (row_data is None or len(row_data) > 0):
-        enabled = False
+        disabled = False
 
-    elif trigger == 'categories-delete.n_clicks':
-        MD.delete_category(row_data)
+    elif trigger == 'confirm-category-danger.submit_n_clicks' and confirm_delete:
+        MD.delete_category(row_data[0])
+        print(f"Deleted category: {row_data[0]['category name']}")
         update_tab = True
 
-    return enabled, update_tab
+    elif trigger == 'categories-table.cellValueChanged':
+        print(cell_data)
+        MD.edit_category(cell_data[0])
+        print(f"Updated category name: '{cell_data[0]['oldValue']}' -> '{cell_data[0]['data']['category name']}'")
+        update_tab = True
+
+    return disabled, update_tab
 
 
 @callback(Output('confirm-account-danger', 'displayed'),

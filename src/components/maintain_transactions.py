@@ -69,6 +69,7 @@ class MaintainDatabase:
             df['amount'] = [''.join(val.split(' $')) for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
             df['date'] = [val.split('T')[0] for val in df['date']]
+            # TODO 'replace' is depreciated, so update this
             source = df['Funding Source'].replace({'Venmo balance': np.nan})
             if any(~source.isna()):
                 df['notes'] = 'Source: ' + source
@@ -350,11 +351,13 @@ class MaintainDatabase:
 
     def edit_category(self, change_dict):
         """Update category data based on edits in Categories table"""
-        new_dict = change_dict[0]['data']
+        new_dict = change_dict['data']
         new_dict.pop('_id')
         new_dict.pop('parent')  # TODO this is a quick fix that will need to be updated when it actually uses parents more
-        old_dict = change_dict[0]['data'].copy()
-        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        old_dict = change_dict['data'].copy()
+        old_dict[change_dict['colId']] = change_dict['oldValue']
+        if old_dict['category name'] != change_dict['data']['category name']:
+            self.transactions_table.update_many({'category': old_dict['category name']}, {'$set': {'category': new_dict['category name']}})
         return self.categories_table.update_one(old_dict, {'$set': new_dict})
 
     def get_hide_from_trends(self):
@@ -363,10 +366,11 @@ class MaintainDatabase:
 
     def delete_category(self, row_data):
         """Delete category in database"""
-        for row in row_data:
-            if row['parent'] == '':
-                row['parent'] = None
-            return self.categories_table.delete_one(row)
+        self.transactions_table.update_many({'category': row_data['category name']}, {'$set': {'category': 'unknow'}})
+        if row_data['parent'] == '':
+            row_data['parent'] = None
+        row_data.pop('_id')
+        return self.categories_table.delete_one(row_data)
 
     """====== Overall ======"""
     def export_data_to_csv(self, root=None):
