@@ -6,8 +6,8 @@ from dateutil.relativedelta import relativedelta
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-import utils
-from utils import zero_params_dict, MD, update_layout_axes
+import components.utils as utils
+from components.utils import zero_params_dict, MD, update_layout_axes
 
 
 def make_trends_plot(conf_dict):
@@ -27,7 +27,7 @@ def make_trends_plot(conf_dict):
         else:
             l_v = {'Spending': {'labels': [], 'values': []},
                    'Income': {'labels': [], 'values': []}}
-            for cat, grp in transactions.groupby(conf_dict['field_filter'].lower()):
+            for cat, grp in transactions.groupby(conf_dict['sort_filter'].lower()):
                 inc_amount = grp['amount'][grp['amount'] > 0].sum()
                 spd_amount = grp['amount'][grp['amount'] < 0].sum()
                 if spd_amount:
@@ -131,7 +131,7 @@ def make_trends_plot(conf_dict):
         for i in range(len(days) - 1):
             this_month = transactions[(transactions['date'].dt.date < days[i]) & (transactions['date'].dt.date >= days[i + 1])]
             net.append(this_month['amount'].sum())
-            for cat, grp in this_month.groupby('category'):
+            for cat, grp in this_month.groupby(conf_dict['sort_filter'].lower()):
                 try:
                     val_dict[cat]['date'].append(days[i + 1])
                     val_dict[cat]['amount'].append(grp['amount'].sum())

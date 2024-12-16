@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from utils import zero_params_dict, MD, update_layout_axes, COLORS
+from components.utils import zero_params_dict, MD, update_layout_axes, COLORS
 
 
 def make_budget_plots(conf_dict):

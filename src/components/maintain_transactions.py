@@ -69,6 +69,7 @@ class MaintainDatabase:
             df['amount'] = [''.join(val.split(' $')) for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
             df['date'] = [val.split('T')[0] for val in df['date']]
+            # TODO 'replace' is depreciated, so update this
             source = df['Funding Source'].replace({'Venmo balance': np.nan})
             if any(~source.isna()):
                 df['notes'] = 'Source: ' + source
@@ -76,15 +77,19 @@ class MaintainDatabase:
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
-        if 'transaction date' in df.columns:  # have this check incase there's both 'transaction date' and 'posted date' in the columns
+
+        if 'transaction date' in df.columns:  # Prefer to use 'transaction date' as opposed to 'posted date' if there's both
             df = df.rename(columns={'transaction date': 'date'})
         else:
             df = df.rename(columns={'post date': 'date', 'posting date': 'date', 'posted date': 'date', 'booking date': 'date'})
+
         if 'original name' in df.columns:
             df = df.rename(columns={'payee': 'description', 'original name': 'original description'})
         else:
             df = df.rename(columns={'payee': 'description'})
+
         df['date'] = pd.to_datetime(df['date'])
+
         if 'credit' in df.columns and 'debit' in df.columns:
             df['amount'] = df['credit'].fillna(-df['debit'])
         elif 'credit debit indicator' in df.columns:
@@ -100,14 +105,17 @@ class MaintainDatabase:
         elif isinstance(df.loc[0]['amount'], str):
             df['amount'] = [''.join(val.split('$')).replace('(', '-').replace(')', '').replace(',', '') for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
+
         if 'original description' not in df.columns:
             try:
                 df['original description'] = df['description']
             except KeyError:
                 return 'Error: Must provide "description" column in the CSV'
         account_labels = True if 'account name' in df.columns else False
+
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
+
         if 'category' not in df.columns or account:
             df['category'] = ''
 
@@ -128,6 +136,7 @@ class MaintainDatabase:
 
         # Add all non-duplicate transactions to database
         transaction_list = []
+        now = datetime.now()
         for i, row in df.iterrows():
             if account_labels:
                 account = row['account name']
@@ -157,16 +166,18 @@ class MaintainDatabase:
                             if matches:
                                 break
                             else:
-                                print(f"Did not insert possible duplicate, but check different description: "
-                                      f"New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                                print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
+                                      f"    New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}")
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
                         if abs((dup['date'] - row['date'])) > timedelta(days=7):
-                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} / "
-                                  f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} \n "
+                                  f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                            if row['date'] - now > timedelta(days=30):
+                                print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
                             break
                         # else:
                         #     matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
@@ -174,11 +185,13 @@ class MaintainDatabase:
                         #         break
                         #     else:
                         #         print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
-                        #               f"Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        #               f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
                         #         break
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                if row['date'] - now > timedelta(days=30):
+                    print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
 
         return transaction_list
 
@@ -278,7 +291,11 @@ class MaintainDatabase:
         """Delete a list of transactions from the Transactions table"""
         for trans in transaction_dict:
             trans.pop('_id')
-            trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+            try:
+                trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+            except TypeError:
+                # The date is already a datetime object
+                pass
             self.transactions_table.delete_one(trans)
 
     """====== Budget ======"""
@@ -344,15 +361,20 @@ class MaintainDatabase:
         return self.accounts_table.insert_one({'account name': account_name, 'status': status, 'initial balance': initial_balance})
 
     def edit_account(self, change_dict):
-        """Update accounts based on edits in Accounts table"""
-        new_dict = change_dict[0]['data']
+        """Update accounts (and transactions, if applicable) based on edits in Accounts table"""
+        new_dict = change_dict['data']
         new_dict.pop('_id')
-        old_dict = change_dict[0]['data'].copy()
-        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        old_dict = change_dict['data'].copy()
+        old_dict[change_dict['colId']] = change_dict['oldValue']
+        if old_dict['account name'] != change_dict['data']['account name']:
+            self.transactions_table.update_many({'account name': old_dict['account name']}, {'$set': {'account name': new_dict['account name']}})
         return self.accounts_table.update_one(old_dict, {'$set': new_dict})
 
     def delete_account(self, row_data):
-        """Delete account in database"""
+        """Delete account in database and all associated transactions"""
+        rm_t = self.transactions_table.find({'account name': row_data['account name']})
+        self.delete_transaction(rm_t)
+        row_data.pop('_id')
         return self.accounts_table.delete_one(row_data)
 
     """====== Category ======"""
@@ -362,11 +384,13 @@ class MaintainDatabase:
 
     def edit_category(self, change_dict):
         """Update category data based on edits in Categories table"""
-        new_dict = change_dict[0]['data']
+        new_dict = change_dict['data']
         new_dict.pop('_id')
         new_dict.pop('parent')  # TODO this is a quick fix that will need to be updated when it actually uses parents more
-        old_dict = change_dict[0]['data'].copy()
-        old_dict[change_dict[0]['colId']] = change_dict[0]['oldValue']
+        old_dict = change_dict['data'].copy()
+        old_dict[change_dict['colId']] = change_dict['oldValue']
+        if old_dict['category name'] != change_dict['data']['category name']:
+            self.transactions_table.update_many({'category': old_dict['category name']}, {'$set': {'category': new_dict['category name']}})
         return self.categories_table.update_one(old_dict, {'$set': new_dict})
 
     def get_categories_list(self, extra=''):
@@ -408,10 +432,11 @@ class MaintainDatabase:
 
     def delete_category(self, row_data):
         """Delete category in database"""
-        for row in row_data:
-            if row['parent'] == '':
-                row['parent'] = None
-            return self.categories_table.delete_one(row)
+        self.transactions_table.update_many({'category': row_data['category name']}, {'$set': {'category': 'unknow'}})
+        if row_data['parent'] == '':
+            row_data['parent'] = None
+        row_data.pop('_id')
+        return self.categories_table.delete_one(row_data)
 
     """====== Overall ======"""
     def export_data_to_csv(self, root=None):

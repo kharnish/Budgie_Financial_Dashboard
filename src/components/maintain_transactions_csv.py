@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 import uuid
 
-from maintain_transactions import MaintainDatabase, EMPTY_TRANSACTION
+from components.maintain_transactions import MaintainDatabase, EMPTY_TRANSACTION
 
 
 class BudgieDF(pd.DataFrame):
@@ -296,7 +296,13 @@ class MaintainCSV(MaintainDatabase):
     def delete_account(self, row_data):
         """Delete account in database"""
         rm_i = self.accounts_table[(self.accounts_table['_id'] == row_data['_id'])].index
-        self.accounts_table = BudgieDF(self.accounts_table.drop(rm_i))
+        print(rm_i)
+        # self.accounts_table = BudgieDF(self.accounts_table.drop(rm_i))
+
+        rm_t = self.query_transactions({'account name': row_data['account name']})
+        print(rm_t)
+
+        # rm_i = self.transactions_table[(self.accounts_table['_id'] == row_data['_id'])].index
 
     """====== Category ======"""
     def add_category(self, category_name, category_parent=None):
