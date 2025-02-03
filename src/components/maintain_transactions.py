@@ -83,13 +83,18 @@ class MaintainDatabase:
         else:
             df = df.rename(columns={'post date': 'date', 'posting date': 'date', 'posted date': 'date', 'booking date': 'date'})
 
+        # Description
         if 'original name' in df.columns:
             df = df.rename(columns={'payee': 'description', 'original name': 'original description'})
         else:
             df = df.rename(columns={'payee': 'description'})
+        if 'original description' not in df.columns:
+            try:
+                df['original description'] = df['description']
+            except KeyError:
+                return 'Error: Must provide "description" column in the CSV'
 
-        df['date'] = pd.to_datetime(df['date'])
-
+        # Amount credit/debit
         if 'credit' in df.columns and 'debit' in df.columns:
             df['amount'] = df['credit'].fillna(-df['debit'])
         elif 'credit debit indicator' in df.columns:
@@ -106,16 +111,12 @@ class MaintainDatabase:
             df['amount'] = [''.join(val.split('$')).replace('(', '-').replace(')', '').replace(',', '') for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
 
-        if 'original description' not in df.columns:
-            try:
-                df['original description'] = df['description']
-            except KeyError:
-                return 'Error: Must provide "description" column in the CSV'
+        # Multiple accounts in one CSV
         account_labels = True if 'account name' in df.columns else False
-
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
 
+        # Category in CSV
         if 'category' not in df.columns or account:
             df['category'] = ''
 
@@ -315,8 +316,7 @@ class MaintainDatabase:
             parent = self.categories_table.find_one({'category name': category})['parent']
             if self.get_budget_amount(parent) != 0:
                 new_group_value = self.get_budget_amount(self.get_children_categories_list(parent))
-                existing = self.budget_table[self.budget_table['category'] == parent]
-                self.budget_table.loc[existing.index, 'value'] = new_group_value
+                self.budget_table.update_one({'category': parent}, {'$set': {'value': new_group_value}})
         except IndexError:
             pass
 
@@ -432,7 +432,7 @@ class MaintainDatabase:
 
     def delete_category(self, row_data):
         """Delete category in database"""
-        self.transactions_table.update_many({'category': row_data['category name']}, {'$set': {'category': 'unknow'}})
+        self.transactions_table.update_many({'category': row_data['category name']}, {'$set': {'category': 'unknown'}})
         if row_data['parent'] == '':
             row_data['parent'] = None
         row_data.pop('_id')
