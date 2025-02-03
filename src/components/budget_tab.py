@@ -1,5 +1,5 @@
 import dash
-from dash import callback, dcc, html, Input, Output, no_update, dash_table
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
 import numpy as np
@@ -206,7 +206,7 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                  html.Div(style={'height': '5px', 'width': '99%', 'float': 'left'}, id='blank-space-4'),
 
                  dbc.Modal(id="budget-modal", is_open=False, children=[
-                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                     dbc.ModalHeader(dbc.ModalTitle("Update New Budget Item")),
                      dbc.ModalBody(children=[
                          html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
                                   children=['Select budget category:',

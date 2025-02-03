@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date

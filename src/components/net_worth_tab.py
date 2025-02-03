@@ -5,7 +5,7 @@ from datetime import date, timedelta, datetime
 import pandas as pd
 import plotly.graph_objects as go
 
-from components.utils import zero_params_dict, MD, update_layout_axes, get_accounts_list, get_color
+from components.utils import zero_params_dict, MD, update_layout_axes, get_accounts_list
 
 
 def make_net_worth_plot(conf_dict):
@@ -90,11 +90,11 @@ def make_net_worth_plot(conf_dict):
         # Plot the account and overall net worth data
         # trace = 0
         for acc in recent_neg.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  #fillcolor=get_color(trace),
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
                                          stackgroup='one', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
             # trace += 1
         for acc in recent_pos.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  #fillcolor=get_color(trace),
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
                                          stackgroup='two', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
             # trace += 1
         fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',

@@ -41,13 +41,13 @@ configurations_sidebar = html.Div(
                           children=["Sort By"]),
                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                 'vertical-align': 'middle'},
-                          children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
-                                                 clearable=False, searchable=False, className='dropdown',
-                                                 options=['Category', 'Account Name'],
-                                                 ),
-                                ]
-                          ),
-                ]),
+                         children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
+                                                clearable=False, searchable=False, className='dropdown',
+                                                options=['Category', 'Account Name'],
+                                                ),
+                                   ]
+                         ),
+                 ]),
 
         dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Time Window']),
@@ -423,7 +423,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
             file_text = decodedBytes.decode("utf-8")
             try:
                 m = pd.read_csv(StringIO(file_text), index_col=False)
-            except:
+            except Exception:
                 msg.append(f"File {i + 1}: File must be in CSV format\n")
                 msg.append(html.Br())
                 continue
@@ -453,7 +453,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                         account_input = {'display': 'inline-block', 'width': '100%'}
                     upload_button = False
 
-            except Exception as e:
+            except Exception:
                 # Give a second chance to upload the file
                 msg.append(f"File {i + 1} Error: Could not parse transactions")
                 msg.append(html.Br())
