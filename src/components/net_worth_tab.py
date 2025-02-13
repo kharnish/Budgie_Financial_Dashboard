@@ -48,7 +48,7 @@ def make_net_worth_plot(conf_dict):
         end_date = datetime.strptime(conf_dict['end_date'], '%Y-%m-%d').date()
         display_delta = end_date - start_date
         days = [end_date]
-        if display_delta < timedelta(days=32):
+        if display_delta < timedelta(days=40):
             iter_delta = timedelta(days=1)
         elif display_delta < timedelta(days=365):
             iter_delta = timedelta(days=7)
@@ -66,7 +66,7 @@ def make_net_worth_plot(conf_dict):
         val_dict = {}
         initial_net_worth = accounts['initial balance'].sum()
         for end_day in days:
-            this_month = transactions[transactions['date'].dt.date < end_day]
+            this_month = transactions[transactions['posted date'].dt.date <= end_day]
             net_worth.append(this_month['amount'].sum() + initial_net_worth)
             for acc in get_accounts_list():
                 acc_status = accounts[accounts['account name'] == acc]
@@ -83,17 +83,20 @@ def make_net_worth_plot(conf_dict):
         val_df = pd.DataFrame(val_dict)
         val_df = val_df.loc[:, (val_df != 0).any(axis=0)]
         recent_worth = val_df.iloc[0]
-        recent_pos = recent_worth[recent_worth >= 0].sort_values(ascending=False)
-        recent_neg = recent_worth[recent_worth < 0].sort_values(ascending=True)
+        average_worth = (val_df.iloc[0] + val_df.iloc[-1])/2
+        recent_pos = recent_worth[average_worth >= 0].sort_values(ascending=False)
+        recent_neg = recent_worth[average_worth < 0].sort_values(ascending=True)
 
         # Plot the account and overall net worth data
+        # trace = 0
         for acc in recent_neg.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='one', meta=acc,
-                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
+                                         stackgroup='one', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            # trace += 1
         for acc in recent_pos.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', stackgroup='two', meta=acc,
-                                         hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
-
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
+                                         stackgroup='two', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
+            # trace += 1
         fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
                                      marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
                                      hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))

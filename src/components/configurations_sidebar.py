@@ -8,7 +8,7 @@ from io import StringIO
 import os
 import pandas as pd
 
-from components.utils import zero_params_dict, get_accounts_list, get_categories_list, MD
+from components.utils import zero_params_dict, get_accounts_list, MD
 
 configurations_sidebar = html.Div(
     id="input-params", style={'width': '24%', 'float': 'left'},  # left column of options/inputs
@@ -32,7 +32,7 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
-                                                 options=get_categories_list(),
+                                                 options=MD.get_categories_list(),
                                                  )
                                     ]
                           ),
@@ -41,13 +41,13 @@ configurations_sidebar = html.Div(
                           children=["Sort By"]),
                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
                                 'vertical-align': 'middle'},
-                          children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
-                                                 clearable=False, searchable=False, className='dropdown',
-                                                 options=['Category', 'Account Name'],
-                                                 ),
-                                ]
-                          ),
-                ]),
+                         children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
+                                                clearable=False, searchable=False, className='dropdown',
+                                                options=['Category', 'Account Name'],
+                                                ),
+                                   ]
+                         ),
+                 ]),
 
         dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Time Window']),
@@ -92,7 +92,7 @@ configurations_sidebar = html.Div(
             html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
                             'vertical-align': 'middle'},
                      children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
-                                            clearable=True, options=get_accounts_list('new'))],
+                                            clearable=True, options=get_accounts_list('multi'))],
                      ),
             html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
                      children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
@@ -108,10 +108,18 @@ configurations_sidebar = html.Div(
             dbc.Modal(id="transaction-modal", is_open=False, children=[
                 dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                 dbc.ModalBody(children=[
-                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
+                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 30px 0 0'},
                              children=['Transaction Date', html.Span(" *", style={"color": "red"}), html.Br(),
                                        dcc.DatePickerSingle(
                                            id='transaction-date',
+                                           min_date_allowed=date(2000, 1, 1),
+                                           max_date_allowed=date.today(),
+                                           initial_visible_month=date.today(),
+                                       )]),
+                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
+                             children=['Posted Date', html.Br(),
+                                       dcc.DatePickerSingle(
+                                           id='posted-date',
                                            min_date_allowed=date(2000, 1, 1),
                                            max_date_allowed=date.today(),
                                            initial_visible_month=date.today(),
@@ -262,7 +270,7 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     if new_params['field_filter'] == 'Account Name':
         filter_dropdown = get_accounts_list()
     else:
-        filter_dropdown = get_categories_list()
+        filter_dropdown = MD.get_categories_list()
 
     if trigger == 'filter-dropdown.value':
         new_params['filter_value'] = filter_values
@@ -293,6 +301,7 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     Input('modal-category-dropdown', 'value'),
     Input('transaction-value-input', 'value'),
     Input('transaction-date', 'date'),
+    Input('posted-date', 'date'),
     Input('description-input', 'value'),
     Input('modal-account-dropdown', 'value'),
     Input('modal-account-input', 'value'),
@@ -300,7 +309,7 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     Input('note-input', 'value'),
     prevent_initial_call=True,
 )
-def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_account, new_category, note):
+def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, p_date, description, account, new_account, new_category, note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     update_tab = no_update
@@ -336,7 +345,13 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify an account.", color="danger")
                 else:
                     account = new_account
-            MD.add_one_transaction(category, amount, t_date, description, account, note)
+
+            if t_date is None:
+                t_date = p_date
+            elif p_date is None:
+                p_date = t_date
+
+            MD.add_one_transaction(category, amount, t_date, p_date, description, account, note)
             if new_account:
                 MD.add_account(new_account)
             if new_category:
@@ -367,7 +382,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
         new_account = None
         note = None
 
-    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, get_categories_list('new'), note, update_tab
+    return is_open, category, amount, t_date, description, account, new_account, acc_style, get_accounts_list('new'), msg_str, new_category, cat_style, MD.get_categories_list('new'), note, update_tab
 
 
 @callback(
@@ -415,6 +430,8 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         # If it's a new account name, note that
         if account == 'Add new account...':
             account = new_account
+        elif account == 'Multiple accounts...':
+            account = None
 
         # Parse the data
         msg = []
@@ -423,12 +440,13 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
             file_text = decodedBytes.decode("utf-8")
             try:
                 m = pd.read_csv(StringIO(file_text), index_col=False)
-            except:
+            except Exception:
                 msg.append(f"File {i + 1}: File must be in CSV format\n")
                 msg.append(html.Br())
                 continue
 
             try:
+                print(f"\nLoading {account} transactions...")
                 results = MD.load_transactions(m, account)
 
                 # If the results were successful, reset the upload center and update the tab
@@ -455,7 +473,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
 
             except Exception as e:
                 # Give a second chance to upload the file
-                msg.append(f"File {i + 1} Error: Could not parse transactions")
+                msg.append(f"File {i + 1} Error: Could not parse transactions. ({e})")
                 msg.append(html.Br())
                 if account_dropdown_value == 'Add new account...':
                     account_input = {'display': 'inline-block', 'width': '100%'}
@@ -465,7 +483,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         account_input = {'display': 'inline-block', 'width': '100%'}
         upload_button = False
 
-    return msg, upload_button, account_input, new_account, get_accounts_list('new'), account_dropdown_value, update_tab
+    return msg, upload_button, account_input, new_account, get_accounts_list('multi'), account_dropdown_value, update_tab
 
 
 @callback(

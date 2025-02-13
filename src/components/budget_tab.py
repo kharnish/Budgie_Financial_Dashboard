@@ -1,12 +1,12 @@
 import dash
-from dash import callback, dcc, html, Input, Output, no_update, dash_table
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_bootstrap_components as dbc
 from datetime import date, datetime, timedelta
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from components.utils import zero_params_dict, MD, update_layout_axes, COLORS, get_categories_list
+from components.utils import zero_params_dict, MD, update_layout_axes, COLORS
 
 
 def make_budget_plots(conf_dict):
@@ -19,9 +19,10 @@ def make_budget_plots(conf_dict):
 
     """
     # Get and alphabetize list of categories
-    pos_dict, neg_dict = MD.get_budget_dict()
+    pos_dict, neg_dict, grp_dict = MD.get_budget_dict()
     pos_dict = dict(sorted(pos_dict.items(), reverse=True))
     neg_dict = dict(sorted(neg_dict.items(), reverse=True))
+    grp_dict = dict(sorted(grp_dict.items(), reverse=True))
 
     transactions = MD.query_transactions(conf_dict)
 
@@ -33,11 +34,19 @@ def make_budget_plots(conf_dict):
 
     fig_income = go.Figure()
     fig_spend = go.Figure()
+    fig_group = go.Figure()
 
-    percent_list = []
-    for fig, budget_dict in [[fig_income, pos_dict], [fig_spend, neg_dict]]:
+    count = 0
+    for fig, budget_dict in [[fig_income, pos_dict], [fig_spend, neg_dict], [fig_group, grp_dict]]:
+        percent_list = []
+        count += 1
         for cat in budget_dict.keys():
-            spent = float(transactions[transactions['category'] == cat]['amount'].sum())
+            # Get overall spending depending on if it's the normal single categories or a group category
+            if count == 3:
+                categories = MD.get_children_categories_list(cat)
+                spent = float(transactions[transactions['category'].isin(categories)]['amount'].sum())
+            else:
+                spent = float(transactions[transactions['category'] == cat]['amount'].sum())
             budgeted = budget_dict[cat] * months
             percent = 100 * spent / budgeted
             percent_list.append(percent)
@@ -81,18 +90,37 @@ def make_budget_plots(conf_dict):
         fig.update_yaxes(showgrid=False)
         fig.update_layout(showlegend=False)
 
+    # Update axis labels (according to how large the plot is)
+    fig_income.update_xaxes(title_text="% Spent")
     fig_spend.update_xaxes(title_text="% Spent")
+    if len(grp_dict) >= 4:
+        fig_spend.update_yaxes(title_text="Individual Category Budgets")
+    elif len(grp_dict) >= 2:
+        fig_spend.update_yaxes(title_text="Individual Category<br>Budgets")
+    else:
+        fig_spend.update_yaxes(title_text="Individual<br>Category<br>Budgets")
+    if len(grp_dict) >= 4:
+        fig_group.update_yaxes(title_text="Group Category Budgets")
+    elif len(grp_dict) >= 2:
+        fig_group.update_yaxes(title_text="Group Category<br>Budgets")
+    else:
+        fig_group.update_yaxes(title_text="Group<br>Category<br>Budgets")
 
     # Use a quick linear equation to get the height of the plot based on the number of bars
     m = 42.573
     b = 75.297
     income_height = m * len(pos_dict) + b
     income_style = {'height': f"{income_height if len(pos_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
+    if len(grp_dict) > 0:
+        group_height = m * len(grp_dict) + b
+        group_style = {'height': f"{group_height if len(grp_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
+    else:
+        group_style = {'display': 'none'}
     spend_height = m * len(neg_dict) + b
     spend_style = {'height': f"{spend_height if len(neg_dict) > 1 else 85}px", 'padding': '0 10px', 'align': 'center'}
 
+    # Moving on to the budget table:
     # Calculate the budget overview table, starting with the sum of the budget
-    pos_dict, neg_dict = MD.get_budget_dict()
     est_income = sum([v for k, v in pos_dict.items()])
     est_spend = sum([v for k, v in neg_dict.items()])
     est_delta = est_income + est_spend
@@ -127,7 +155,7 @@ def make_budget_plots(conf_dict):
                  html.Td(style={'textAlign': 'right', 'color': est_color}, children=[f"$ {est_delta:,.2f}"])])
     ])]
 
-    return fig_income, income_style, fig_spend, spend_style, equation
+    return fig_income, income_style, fig_group, group_style, fig_spend, spend_style, equation
 
 
 initial_plots = make_budget_plots(zero_params_dict())
@@ -141,9 +169,11 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                      dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
                      dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
                                              'Set a new category budget or update an exising budget with the Add or Update Budget button.', html.Br(), html.Br(),
-                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(),
-                                             html.Br(),
-                                             'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.'])]),
+                                             'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(), html.Br(),
+                                             'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.', html.Br(), html.Br(),
+                                             'Budgie uses a Zero-Based Budget, which means that every dollar you expect to earn should be accounted for in either in expenses or savings. This is '
+                                             'reflected in the Actuals/Budget table that shows your total actual and budgeted income and spending over the month.'
+                                             ])]),
 
                  html.Div(style={'display': 'inline-block', 'padding': '10px', 'float': 'left'},
                           children=[dbc.Button(id='new-budget-button', style={'width': '200px'},
@@ -170,20 +200,21 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                  html.Div(style={'padding': '0 0 0 40px'}, children=[html.H4(['Income'])]),
                  dcc.Graph(style=initial_plots[1], id='budget-graph-income', figure=initial_plots[0]),
                  html.Div(style={'padding': '10px 0 0 40px'}, children=[html.H4(['Spending'])]),
-                 dcc.Graph(style=initial_plots[3], id='budget-graph-spend', figure=initial_plots[2]),
+                 dcc.Graph(style=initial_plots[3], id='budget-graph-group', figure=initial_plots[2]),
+                 dcc.Graph(style=initial_plots[5], id='budget-graph-spend', figure=initial_plots[4]),
 
                  html.Div(style={'height': '5px', 'width': '99%', 'float': 'left'}, id='blank-space-4'),
 
                  dbc.Modal(id="budget-modal", is_open=False, children=[
-                     dbc.ModalHeader(dbc.ModalTitle("Add New Budget Item")),
+                     dbc.ModalHeader(dbc.ModalTitle("Update New Budget Item")),
                      dbc.ModalBody(children=[
                          html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0px 5px 5px 0'},
                                   children=['Select budget category:',
                                             dcc.Dropdown(id='budget-category-dropdown', className='dropdown', clearable=True, placeholder='Select category...',
                                                          style={'display': 'inline-block', 'width': '400px', 'vertical-align': 'middle'},
                                                          options=[''])]),
-                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
-                                  children=['Define budget amount:', html.Br(),
+                         html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0 10px 0'},
+                                  children=[html.Div(id='budget-num-text-input', style={'padding': '0'}, children=['Budget amount:']),
                                             dcc.Input(id='budget-value-input', type='number', placeholder='$ 0', style={'width': '100px'})]),
                          html.Div(id='modal-average-text', style={'padding': '5px 0 10px 0'}),
                          html.Div(style={'float': 'right', 'position': 'absolute', 'bottom': 10, 'right': 10},
@@ -209,11 +240,13 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
     Output('budget-category-dropdown', 'options'),
     Output('budget-category-dropdown', 'value'),
     Output('budget-value-input', 'value'),
+    Output('budget-value-input', 'disabled'),
     Output('modal-body-text', 'children'),
     Output('modal-body-text', 'style'),
     Output('modal-average-text', 'children'),
     Output('modal-average-text', 'style'),
     Output('modal-delete', 'style'),
+    Output('budget-num-text-input', 'children'),
     Output('update-tab', 'data', allow_duplicate=True),
 
     Input("new-budget-button", "n_clicks"),
@@ -235,45 +268,71 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
     avg_style = {'padding': '0'}
     update_tab = no_update
     delete = {'display': 'none'}
+    num_text = 'Budget amount:'
+    input_disabled = False
 
-    if trigger in ['new-budget-button.n_clicks', 'budget-category-dropdown.value']:
-        if budget_category is not None:
-            if isinstance(MD.budget_table, pd.DataFrame):
-                bv = MD.budget_table.find({'category': budget_category})
-            else:
-                bv = list(MD.budget_table.find({'category': budget_category}))
-            if len(bv) > 0:
-                try:
-                    budget_value = budget_value if trigger == 'budget-value-input.value' else bv[0]['value']
-                except KeyError:
-                    budget_value = budget_value if trigger == 'budget-value-input.value' else bv.iloc[0]['value']
-                delete = {'float': 'right'}
-                avg_style = {'padding': '0 0 25px 0'}
+    if trigger == 'new-budget-button.n_clicks':
+        budget_category = None
+        is_open = True
+        categories = MD.get_categories_list('parent')
+        budget_value = None
+        avg_str = None
+
+    elif trigger == 'budget-category-dropdown.value':
+        # Query the budget database to see if a budget for those categories
+        bv = MD.get_budget_amount(budget_category)
+
+        # If it's a parent category, then give the default budget amount
+        if budget_category in MD.get_categories_list('parent_only'):
+            budget_value = 0
+            transactions = pd.DataFrame()
+            for child_cat in MD.get_children_categories_list(budget_category):
+                # Get the total budgeted amount for all child categories
+                budget_value += MD.get_budget_amount(child_cat)
+                # Query all transactions to get the average spent per all child categories
+                transactions = pd.concat([transactions, pd.DataFrame(MD.transactions_table.find({
+                    'posted date': {'$gte': datetime.today() - timedelta(days=180),
+                                    '$lte': datetime.today()},
+                    'category': child_cat}))])
+            num_text = 'Budget group amount:'
+            input_disabled = True
+
+        # But if it's a single category, allow value input
+        else:
+            if bv != 0:
+                budget_value = budget_value if trigger == 'budget-value-input.value' else bv
             else:
                 budget_value = None
-
+            # Query all transactions to get the average spent per the categories specified
             transactions = pd.DataFrame(MD.transactions_table.find({
-                'date': {'$gte': datetime.today() - timedelta(days=180),
-                         '$lte': datetime.today()},
+                'posted date': {'$gte': datetime.today() - timedelta(days=180),
+                                '$lte': datetime.today()},
                 'category': budget_category}))
-            if len(transactions) == 0:
-                spent = 0
-            else:
-                spent = transactions.amount.sum() / 6
-            if spent <= 0:
-                avg_str = html.P([f"Monthly spending for '{budget_category}' over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
-            else:
-                avg_str = html.P([f"Monthly income for '{budget_category}' over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
+
+        # Check if value exists, if so, give option to delete it
+        if bv != 0:
+            delete = {'float': 'right'}
+            avg_style = {'padding': '10px 0 25px 0'}
+
+        if len(transactions) == 0:
+            spent = 0
+        else:
+            spent = transactions.amount.sum() / 6
+        if spent <= 0:
+            avg_str = html.P([f"Monthly spending for {budget_category} over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
+        else:
+            avg_str = html.P([f"Monthly income for {budget_category} over the past 6 months: ", html.Br(), f"$ {spent:.2f}"])
+
         is_open = True
-        categories = get_categories_list()
+        categories = MD.get_categories_list('parent')
 
     elif trigger == 'budget-value-input.value':
         is_open = True
-        categories = get_categories_list()
+        categories = MD.get_categories_list('parent')
 
     elif trigger == 'modal-submit.n_clicks':
         categories = list(MD.transactions_table.find().distinct('category'))
-        if budget_category is not None and budget_value is not None:
+        if budget_category is not None and budget_value is not None and budget_value != 0:
             MD.add_budget_item(budget_category, budget_value)
             update_tab = True
             budget_category = None
@@ -299,7 +358,7 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
         budget_value = None
         avg_str = None
 
-    return is_open, categories, budget_category, budget_value, msg_str, msg_style, avg_str, avg_style, delete, update_tab
+    return is_open, categories, budget_category, budget_value, input_disabled, msg_str, msg_style, avg_str, avg_style, delete, num_text, update_tab
 
 
 @callback(

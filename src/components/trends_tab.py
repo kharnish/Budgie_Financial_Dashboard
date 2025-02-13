@@ -1,5 +1,5 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output
+from dash import callback, dcc, html, Input, Output
 import dash_bootstrap_components as dbc
 from datetime import date, timedelta, datetime
 from dateutil.relativedelta import relativedelta
@@ -57,8 +57,11 @@ def make_trends_plot(conf_dict):
             desc = all_data.loc[0]['description']
         except TypeError:
             all_data = list(all_data)
-            desc = all_data[0]['description'] == 'No Available Data'
-        if len(all_data) == 1 and desc == 'No Available Data':
+            try:
+                desc = all_data[0]['description'] == 'No Available Data'
+            except IndexError:
+                text = 'No data found. Start by adding a transaction CSV file or individual transaction on the right.'
+        if len(all_data) >= 1 and desc == 'No Available Data':
             text = 'No data found. Start by adding a transaction CSV file or individual transaction on the right.'
         plot_type = 'text_only'
 
@@ -129,14 +132,14 @@ def make_trends_plot(conf_dict):
         val_dict = {}
         net = []
         for i in range(len(days) - 1):
-            this_month = transactions[(transactions['date'].dt.date < days[i]) & (transactions['date'].dt.date >= days[i + 1])]
+            this_month = transactions[(transactions['posted date'].dt.date < days[i]) & (transactions['posted date'].dt.date >= days[i + 1])]
             net.append(this_month['amount'].sum())
             for cat, grp in this_month.groupby(conf_dict['sort_filter'].lower()):
                 try:
-                    val_dict[cat]['date'].append(days[i + 1])
+                    val_dict[cat]['posted date'].append(days[i + 1])
                     val_dict[cat]['amount'].append(grp['amount'].sum())
                 except KeyError:
-                    val_dict[cat] = {'date': [days[i + 1]], 'amount': [grp['amount'].sum()]}
+                    val_dict[cat] = {'posted date': [days[i + 1]], 'amount': [grp['amount'].sum()]}
 
         # Alphabetize list of categories
         val_dict = dict(sorted(val_dict.items()))
@@ -146,10 +149,10 @@ def make_trends_plot(conf_dict):
                                      marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
                                      hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
         for key, val in val_dict.items():
-            fig_obj.add_trace(go.Bar(x=val['date'], y=val['amount'], name=key, legendgroup=key,
+            fig_obj.add_trace(go.Bar(x=val['posted date'], y=val['amount'], name=key, legendgroup=key,
                                      meta=key, hovertemplate="%{meta}<br>$%{y:,.2f}<extra></extra>"))
 
-        fig_obj.update_xaxes(title_text="Date")
+        fig_obj.update_xaxes(title_text="Posted Date")
         fig_obj.update_yaxes(title_text="Amount ($)")
         fig_obj.update_layout(barmode='relative')
 

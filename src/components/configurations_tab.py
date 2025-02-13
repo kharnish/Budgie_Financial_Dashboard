@@ -4,7 +4,7 @@ import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 import pandas as pd
 
-from components.utils import MD, get_categories_list
+from components.utils import MD
 
 
 def make_accounts_table(check_update=False):
@@ -55,23 +55,34 @@ def make_categories_table(check_update=False):
     # Query and organize account data
     categories = pd.DataFrame(MD.categories_table.find())
 
-    if len(categories) == 0:
-        return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
-
     if check_update:
         # If you delete all items from a category, it needs to trigger to delete the name
-        current_cats = get_categories_list()
+        current_cats = MD.get_categories_list()
         refresh = False
         for _, grp in categories.iterrows():
             if grp['category name'] not in current_cats:
                 for delete_cat in [grp.to_dict()]:
                     MD.delete_category(delete_cat)
                 refresh = True
+
+        # If there's a category in the transactions that's not in the table, add it to the table
+        try:
+            table_cat_list = list(categories['category name'])
+        except KeyError:
+            table_cat_list = []
+        for cat in current_cats:
+            if cat not in table_cat_list:
+                MD.add_category(cat)
+
+        # Refresh the table
         if refresh:
             categories = pd.DataFrame(MD.categories_table.find())
 
+    if len(categories) == 0:
+        return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
+
     categories.loc[:, '_id'] = [str(tid) for tid in categories['_id']]
-    categories = categories.loc[categories["category name"].str.lower().sort_values().index]
+    categories = categories.sort_values(['parent', 'category name'], key=lambda column: column.str.lower())
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -194,13 +205,13 @@ def update_categories_table(confirm_delete, row_data, cell_data):
 
     elif trigger == 'confirm-category-danger.submit_n_clicks' and confirm_delete:
         MD.delete_category(row_data[0])
-        print(f"Deleted category: {row_data[0]['category name']}")
+        print(f"  Deleted category: {row_data[0]['category name']}")
         update_tab = True
 
     elif trigger == 'categories-table.cellValueChanged':
         print(cell_data)
         MD.edit_category(cell_data[0])
-        print(f"Updated category name: '{cell_data[0]['oldValue']}' -> '{cell_data[0]['data']['category name']}'")
+        print(f"  Updated category name: '{cell_data[0]['oldValue']}' -> '{cell_data[0]['data']['category name']}'")
         update_tab = True
 
     return disabled, update_tab
