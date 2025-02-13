@@ -7,13 +7,13 @@ import os
 import pandas as pd
 import pymongo
 
-TRANSACTIONS_CLIENT = 'transactions_3'
+TRANSACTIONS_CLIENT = 'transactions'
 BUDGET_CLIENT = 'budget'
 ACCOUNTS_CLIENT = 'accounts'
 CATEGORIES_CLIENT = 'categories'
 
-EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': ['None'], 'date': [datetime.today()], 'category': ['unknown'], 'description': ['No Available Data'],
-                                            'amount': [0], 'account name': ['None'], 'notes': ['None']})
+EMPTY_TRANSACTION = pd.DataFrame.from_dict({'_id': ['None'], 'transaction date': [datetime.today()], 'posted date': [datetime.today()], 'category': ['unknown'],
+                                            'description': ['No Available Data'], 'amount': [0], 'account name': ['None'], 'notes': ['None']})
 
 
 class MaintainDatabase:
@@ -65,10 +65,10 @@ class MaintainDatabase:
                 df.drop([0, 1, 2], inplace=True)
                 df = df.reset_index(drop=True)
             df.drop(len(df) - 1, inplace=True)
-            df = df.rename(columns={'Datetime': 'date', 'Note': 'description', 'Amount (total)': 'amount'})
+            df = df.rename(columns={'Datetime': 'posted date', 'Note': 'description', 'Amount (total)': 'amount'})
             df['amount'] = [''.join(val.split(' $')) for val in df['amount']]
             df['amount'] = df['amount'].astype(float)
-            df['date'] = [val.split('T')[0] for val in df['date']]
+            df['posted date'] = [val.split('T')[0] for val in df['posted date']]
             # TODO 'replace' is depreciated, so update this
             source = df['Funding Source'].replace({'Venmo balance': np.nan})
             if any(~source.isna()):
@@ -78,10 +78,14 @@ class MaintainDatabase:
         df = df.dropna(axis='columns', how='all')
         df.columns = [col.lower().replace('_', ' ') for col in df.columns]
 
-        if 'transaction date' in df.columns:  # Prefer to use 'transaction date' as opposed to 'posted date' if there's both
-            df = df.rename(columns={'transaction date': 'date'})
-        else:
-            df = df.rename(columns={'post date': 'date', 'posting date': 'date', 'posted date': 'date', 'booking date': 'date'})
+        # Ensure both Transaction and Posted dates
+        df = df.rename(columns={'posting date': 'posted date', 'post date': 'posted date',  'booking date': 'posted date'})
+        if 'transaction date' in df.columns and 'posted date' not in df.columns:
+            df['posted date'] = df['transaction date']
+        elif 'posted date' in df.columns and 'transaction date' not in df.columns:
+            df['transaction date'] = df['posted date']
+        df['posted date'] = pd.to_datetime(df['posted date']).map(lambda x: x.replace(tzinfo=None))
+        df['transaction date'] = pd.to_datetime(df['transaction date']).map(lambda x: x.replace(tzinfo=None))
 
         # Description
         if 'original name' in df.columns:
@@ -122,14 +126,14 @@ class MaintainDatabase:
 
         # Replace NA with empty string and remove transactions with no date
         df = df.fillna('')
-        df = df.dropna(subset='date', axis='index')
+        df = df.dropna(subset='posted date', axis='index')
 
         # If only one account for that file, get autocategorization categories from previous data
         if account:
             self._get_categories(account)
 
         # Check to ensure all the necessary columns were converted
-        necessary_columns = ['date', 'description', 'amount']
+        necessary_columns = ['transaction date', 'posted date', 'description', 'amount']
         for col in necessary_columns:
             if col not in df.columns:
                 print(f"Error: CSV does not contain '{col}' column")
@@ -142,7 +146,7 @@ class MaintainDatabase:
             if account_labels:
                 account = row['account name']
 
-            duplicates = self.transactions_table.find({'amount': row['amount'], 'account name': account}).sort({'date': -1})
+            duplicates = self.transactions_table.find({'amount': row['amount'], 'account name': account}).sort({'posted date': -1})
             if isinstance(duplicates, pd.DataFrame):
                 # TODO verify that this works with CSV and BudgieDF
                 len_dups = len(duplicates)
@@ -156,9 +160,9 @@ class MaintainDatabase:
                     if isinstance(dup, tuple):
                         dup = dup[1]
 
-                    if dup['date'] > row['date']:
+                    if dup['posted date'] > row['posted date']:
                         continue
-                    if dup['date'] == row['date']:
+                    if dup['posted date'] == row['posted date']:
                         if dup['original description'] == row['original description']:
                             # It's an exact match for amount, description, and date, so definitely a duplicate
                             break
@@ -168,37 +172,38 @@ class MaintainDatabase:
                                 break
                             else:
                                 print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
-                                      f"    New: {row['date']}, {row['original description']} / Existing: {dup['date']}, {dup['original description']}")
+                                      f"    New: {row['posted date']}, {row['original description']} / Existing: {dup['posted date']}, {dup['original description']}")
                                 break
                     else:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
-                        if abs((dup['date'] - row['date'])) > timedelta(days=7):
-                            print(f"Inserted possible repeating transaction: New: {row['date']}, {row['original description']} \n "
-                                  f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        if abs((dup['posted date'] - row['posted date'])) > timedelta(days=7):
+                            print(f"Possible repeating transaction: New: {row['posted date']}, {row['original description']} \n "
+                                  f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
-                            if row['date'] - now > timedelta(days=30):
-                                print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
+                            if row['posted date'] - now > timedelta(days=30):
+                                print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
                             break
                         # else:
                         #     matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
                         #     if matches:
                         #         break
                         #     else:
-                        #         print(f"Did not insert possible duplicate item: New: {row['date']}, {row['original description']} / "
-                        #               f"    Existing: {dup['date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        #         print(f"Did not insert possible duplicate item: New: {row['posted date']}, {row['original description']} / "
+                        #               f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
                         #         break
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
-                if row['date'] - now > timedelta(days=30):
-                    print(f"Inserted transaction from over a month ago: {row['date']}, {row['original description']}, ${row['amount']:.2f}")
+                if row['posted date'] - now > timedelta(days=30):
+                    print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
 
         return transaction_list
 
-    def add_one_transaction(self, category, amount, t_date, description, account, note):
+    def add_one_transaction(self, category, amount, t_date, p_date, description, account, note):
         """Add a single manual transaction to the database"""
-        transaction = {'date': datetime.strptime(t_date, '%Y-%m-%d'),
+        transaction = {'transaction date': datetime.strptime(t_date, '%Y-%m-%d'),
+                       'posted date': datetime.strptime(p_date, '%Y-%m-%d'),
                        'category': category,
                        'description': description,
                        'amount': amount,
@@ -210,7 +215,8 @@ class MaintainDatabase:
     @staticmethod
     def _make_transaction_dict(td, category, account):
         """Convert transaction dictionary into standard transaction dictionary"""
-        default_transaction = {'date': td['date'],
+        default_transaction = {'transaction date': td['transaction date'],
+                               'posted date': td['posted date'],
                                'category': category,
                                'description': td['description'],
                                'amount': td['amount'],
@@ -226,19 +232,19 @@ class MaintainDatabase:
                 'account name': account}},
             {'$group': {  # get the most recent, unique original description
                 '_id': '$original description',
-                'date': {'$last': '$date'},
+                'posted date': {'$last': '$posted date'},
                 'cat': {'$last': '$category'}}}
         ]))
         self.autocategories = {}
         for cat in k:
-            self.autocategories[cat['_id']] = {'category': cat['cat'], 'date': cat['date']}
+            self.autocategories[cat['_id']] = {'category': cat['cat'], 'posted date': cat['posted date']}
 
     def _autocategorize(self, row):
         """Check with all the known descriptions if there are any close, and if so, use the last known category"""
         try:
             matches = get_close_matches(row['original description'], self.autocategories.keys(), cutoff=0.7)
             matches_data = [self.autocategories[match] for match in matches]
-            i_most_recent = np.argmax([cat['date'] for cat in matches_data])
+            i_most_recent = np.argmax([cat['posted date'] for cat in matches_data])
             return matches_data[i_most_recent]['category']
         except (ValueError, AttributeError):
             return row['category'] if row['category'] != '' else 'unknown'
@@ -257,7 +263,7 @@ class MaintainDatabase:
             mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
 
         transactions = pd.DataFrame(self.transactions_table.find({
-            'date': {
+            'posted date': {
                 '$gte': datetime.strptime(conf_dict['start_date'], '%Y-%m-%d'),
                 '$lte': datetime.strptime(conf_dict['end_date'], '%Y-%m-%d')},
             **mongo_filter}))
@@ -267,11 +273,12 @@ class MaintainDatabase:
         return transactions
 
     def get_oldest_transaction(self):
-        return list(self.transactions_table.find().sort({'date': 1}).limit(1))[0]['date'].date()
+        return list(self.transactions_table.find().sort({'posted date': 1}).limit(1))[0]['posted date'].date()
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
-        change_dict[0]['data']['date'] = datetime.strptime(change_dict[0]['data']['date'], '%m-%d-%Y')
+        change_dict[0]['data']['transaction date'] = datetime.strptime(change_dict[0]['data']['transaction date'], '%m-%d-%Y')
+        change_dict[0]['data']['posted date'] = datetime.strptime(change_dict[0]['data']['posted date'], '%m-%d-%Y')
         new_dict = change_dict[0]['data']
         new_dict.pop('_id')
         old_dict = change_dict[0]['data'].copy()
@@ -282,9 +289,11 @@ class MaintainDatabase:
         """Edit data for multiple transactions at one time"""
         for new_trans in transaction_list:
             try:
-                new_trans['date'] = datetime.strptime(new_trans['date'], '%Y-%m-%d')
+                new_trans['transaction date'] = datetime.strptime(new_trans['transaction date'], '%Y-%m-%d')
+                new_trans['posted date'] = datetime.strptime(new_trans['posted date'], '%Y-%m-%d')
             except ValueError:
-                new_trans['date'] = datetime.strptime(new_trans['date'], '%m-%d-%Y')
+                new_trans['transaction date'] = datetime.strptime(new_trans['transaction date'], '%m-%d-%Y')
+                new_trans['posted date'] = datetime.strptime(new_trans['posted date'], '%m-%d-%Y')
             tid = new_trans.pop('_id')
             self.transactions_table.update_one({'_id': ObjectId(tid)}, {'$set': new_trans})
 
@@ -293,7 +302,8 @@ class MaintainDatabase:
         for trans in transaction_dict:
             trans.pop('_id')
             try:
-                trans['date'] = datetime.strptime(trans['date'], '%m-%d-%Y')
+                trans['transaction date'] = datetime.strptime(trans['transaction date'], '%m-%d-%Y')
+                trans['posted date'] = datetime.strptime(trans['posted date'], '%m-%d-%Y')
             except TypeError:
                 # The date is already a datetime object
                 pass
@@ -447,10 +457,6 @@ class MaintainDatabase:
         for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
-            try:
-                this_data = this_data.drop(columns=['currency'])
-            except KeyError:
-                pass
             this_data.to_csv(os.path.join(root, coll.name + '.csv'), index=False)
         return root
 

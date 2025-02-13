@@ -6,7 +6,7 @@ import sys
 from components.maintain_transactions import MaintainDatabase
 from components.maintain_transactions_csv import MaintainCSV
 
-EXCLUDE_FROM_TABLE = ['_id', 'original description', 'currency']
+EXCLUDE_FROM_TABLE = ['_id', 'original description']
 
 PLOTLY_COLORS = [
     '#636EFA',
@@ -92,6 +92,9 @@ def get_accounts_list(extra=''):
     if extra == 'new':
         acc_list = list(MD.transactions_table.find().distinct('account name'))
         acc_list.extend(['Add new account...'])
+    if extra == 'multi':
+        acc_list = list(MD.transactions_table.find().distinct('account name'))
+        acc_list.extend(['Multiple accounts...', 'Add new account...'])
     else:
         acc_list.extend(MD.transactions_table.find().distinct('account name'))
 
