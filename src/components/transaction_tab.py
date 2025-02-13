@@ -124,6 +124,7 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
 
                      html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-transactions',
                               children=[html.I(className="fa-solid fa-circle-question")]),
+
                      dbc.Modal(id="transactions-help", is_open=False, children=[
                          dbc.ModalHeader(dbc.ModalTitle("Transactions Help")),
                          dbc.ModalBody(children=['The Transactions tab allows you to see and edit your individual transactions.', html.Br(), html.Br(),
@@ -132,6 +133,8 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                                                  'Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. '
                                                  'Press the space bar to undo/redo your selection.'
                                                  ])]),
+
+                     html.Div(style={'padding': '10px 50px 0 0', 'float': 'right'}, id='transactions-stats', children=[]),
 
                      dag.AgGrid(id="transactions-table",
                                 style={"height": '600px'},
@@ -179,6 +182,7 @@ def update_table_data(change_data):
     Output('new-account-dropdown', 'placeholder'),
     Output('new-modal-text', 'children'),
     Output('new-note-input', 'value'),
+    Output('transactions-stats', 'children'),
     Output('update-tab', 'data', allow_duplicate=True),
 
     Input('transact-edit', 'n_clicks'),
@@ -308,8 +312,14 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         new_account = None
         new_note = None
 
+    if len(row_data) > 0:
+        amounts = [rd['amount'] for rd in row_data]
+        transaction_stats = [html.B(len(row_data)), ' row(s) selected. ', ' ', ' Total Value: ', html.B(f"$ {sum(amounts):.2f}")]
+    else:
+        transaction_stats = []
+
     return enabled, enabled, is_open, category, cat_style, new_category, MD.get_categories_list('new'), ph_category, amount, ph_amount, t_date, ph_transaction, p_date, ph_posted, \
-        description, ph_description, account, account_style, new_account, ph_account, msg_str, new_note, update_tab
+        description, ph_description, account, account_style, new_account, ph_account, msg_str, new_note, transaction_stats, update_tab
 
 
 @callback(
