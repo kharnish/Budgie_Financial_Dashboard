@@ -82,6 +82,7 @@ def update_tab_data(current_params, which_tab, update_tab):
     Args:
         current_params: Dictionary of original parameters from loaded config file.
         which_tab: The active tab to update the values of
+        update_tab: Trigger to update the table
 
     Returns:
         Figure object of plot
