@@ -257,7 +257,7 @@ class MaintainDatabase:
 
         Returns: Pandas Dataframe of transactions
         """
-        if len(conf_dict['filter_value']) == 0:
+        if len(conf_dict['filter_value']['category']) == 0 and len(conf_dict['filter_value']['account']) == 0:
             mongo_filter = {}
         else:
             mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
