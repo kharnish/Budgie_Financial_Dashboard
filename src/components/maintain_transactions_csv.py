@@ -152,7 +152,7 @@ class MaintainCSV(MaintainDatabase):
         """Query dataframe according to configuration dict parameters
 
         Args:
-             conf_dict:
+            conf_dict: Dictionary of the configuration parameters.
 
         Returns: Pandas Dataframe of transactions
         """
