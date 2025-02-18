@@ -1,10 +1,10 @@
 import dash
-from dash import Dash, callback, dcc, html, Input, Output, no_update
+from dash import callback, dcc, html, Input, Output, no_update
 import dash_ag_grid as dag
 import dash_bootstrap_components as dbc
 from datetime import date
 
-from utils import zero_params_dict, MD, get_mongo_transactions, EXCLUDE_FROM_TABLE, get_categories_list, get_accounts_list
+from components.utils import zero_params_dict, MD, EXCLUDE_FROM_TABLE, get_accounts_list
 
 
 def make_table(conf_dict):
@@ -15,8 +15,8 @@ def make_table(conf_dict):
 
     Returns: Data and Columns dictionary
     """
-    transactions = get_mongo_transactions(conf_dict)
-    transactions['_id'] = [str(tid) for tid in transactions['_id']]
+    transactions = MD.query_transactions(conf_dict)
+    transactions.loc[:, '_id'] = [str(tid) for tid in transactions['_id']]
     transactions = transactions.sort_values('date', ascending=False)
     transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
@@ -27,7 +27,7 @@ def make_table(conf_dict):
         if col['field'] in EXCLUDE_FROM_TABLE:
             col['hide'] = True
         elif col['field'] == 'amount':
-            col['valueFormatter'] = {"function": "d3.format('($.2f')(params.value)"}
+            col['valueFormatter'] = {"function": "d3.format('($,.2f')(params.value)"}
             col['type'] = 'numericColumn'
             col['cellStyle'] = {"function": "params.value < 0 ? {'color': 'firebrick'} : {'color': 'seagreen'}"}
             col['filter'] = 'agNumberColumnFilter'
@@ -36,7 +36,7 @@ def make_table(conf_dict):
             col['width'] = 150
             col['editable'] = True
             col['cellEditor'] = 'agSelectCellEditor'
-            col['cellEditorParams'] = {'values': get_categories_list()}
+            col['cellEditorParams'] = {'values': MD.get_categories_list()}
         elif col['field'] == 'description':
             col['width'] = 400
             col['editable'] = True
@@ -107,13 +107,18 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                      html.Div(style={'padding': '10px', 'display': 'inline-block'},
                               children=[dbc.Button(children=["Delete ", html.I(className="fa-solid fa-trash-can")],
                                                    style={'width': '100px'}, id="transact-delete", disabled=True, color="danger")]),
-                     html.I(className="fa-solid fa-circle-info", id='help-icon-2'),
-                     dbc.Tooltip("Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. "
-                                 "Press the space bar to undo/redo your selection",
-                                 target='help-icon-2',
-                                 placement='right',
-                                 style={'font-size': 14},
-                                 ),
+
+                     html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-transactions',
+                              children=[html.I(className="fa-solid fa-circle-question")]),
+                     dbc.Modal(id="transactions-help", is_open=False, children=[
+                         dbc.ModalHeader(dbc.ModalTitle("Transactions Help")),
+                         dbc.ModalBody(children=['The Transactions tab allows you to see and edit your individual transactions.', html.Br(), html.Br(),
+                                                 'Add new transactions either by uploading a CSV file or inputting a manual transaction from the menu on the left.', html.Br(), html.Br(),
+                                                 'Quick edit a single transaction by double clicking the value to modify, or select row(s) and use the Edit button for more detailed edits.', html.Br(), html.Br(),
+                                                 'Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. '
+                                                 'Press the space bar to undo/redo your selection.'
+                                                 ])]),
+
                      dag.AgGrid(id="transactions-table",
                                 style={"height": '600px'},
                                 rowData=tab.get('data'),
@@ -231,9 +236,13 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                 for key, val in update_dict.items():
                     r[key] = val
             MD.edit_many_transactions(row_data)
-            # TODO Update Table
+
             if new_account:
                 MD.add_account(new_account)
+            if new_category:
+                MD.add_category(new_category)
+            MD.export_data_to_csv()
+
             category = None
             new_category = None
             amount = None
@@ -260,5 +269,17 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         new_account = None
         new_note = None
 
-    return enabled, enabled, is_open, category, cat_style, new_category, get_categories_list('new'), amount, t_date, description, account, \
+    return enabled, enabled, is_open, category, cat_style, new_category, MD.get_categories_list('new'), amount, t_date, description, account, \
         account_style, new_account, msg_str, new_note, update_tab
+
+
+@callback(
+    Output('transactions-help', 'is_open'),
+    Input('help-transactions', 'n_clicks')
+)
+def help_modal(clicks):
+    isopen = False
+    trigger = dash.callback_context.triggered[0]['prop_id']
+    if trigger == 'help-transactions.n_clicks':
+        isopen = True
+    return isopen
