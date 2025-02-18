@@ -27,7 +27,7 @@ configurations_sidebar = html.Div(
                                     ]
                           ),
                  ]),
-        dbc.Row(id='cat-row', style=None,  # {'display': 'none'},
+        dbc.Row(id='cat-row', style=None,
                 children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Category Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
@@ -38,7 +38,7 @@ configurations_sidebar = html.Div(
                                     ]
                                    ),
                           ]),
-        dbc.Row(id='acc-row', style=None,  # {'display': 'none'},
+        dbc.Row(id='acc-row', style=None,
                 children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Account Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
