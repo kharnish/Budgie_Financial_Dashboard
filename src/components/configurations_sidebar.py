@@ -21,25 +21,37 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='field-dropdown', value=zero_params_dict()['field_filter'],
                                                  clearable=False, searchable=False, className='dropdown',
+                                                 multi=True, placeholder='Select...',
                                                  options=['Category', 'Account Name'],
                                                  ),
                                     ]
                           ),
                  ]),
-        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
-                          children=['Select Filter']),
-                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0',
-                                 'vertical-align': 'middle'},
-                          children=[dcc.Dropdown(id='filter-dropdown', maxHeight=400, clearable=True,
+        dbc.Row(id='cat-row', style=None,
+                children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                          children=['Category Filter']),
+                          html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='cat-filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
                                                  options=MD.get_categories_list(),
                                                  )
                                     ]
-                          ),
-                 ]),
-        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
+                                   ),
+                          ]),
+        dbc.Row(id='acc-row', style=None,
+                children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+                          children=['Account Filter']),
+                          html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
+                          children=[dcc.Dropdown(id='acc-filter-dropdown', maxHeight=400, clearable=True,
+                                                 searchable=True, className='dropdown', multi=True,
+                                                 options=get_accounts_list(),
+                                                 )
+                                    ]
+                                   ),
+                          ]),
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '30px 20px 10px 20px'},
                           children=["Sort By"]),
-                html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '20px 0 10px 0',
                                 'vertical-align': 'middle'},
                          children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
                                                 clearable=False, searchable=False, className='dropdown',
@@ -48,10 +60,9 @@ configurations_sidebar = html.Div(
                                    ]
                          ),
                  ]),
-
-        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px 5px 20px'},
                           children=['Time Window']),
-                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0',
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
                                                  clearable=False, searchable=False, className='dropdown',
@@ -92,7 +103,7 @@ configurations_sidebar = html.Div(
             html.Div(style={'width': '94%', 'display': 'inline-block', 'padding': '0 20px',
                             'vertical-align': 'middle'},
                      children=[dcc.Dropdown(id='account-dropdown', className='dropdown', placeholder="Select account...",
-                                            clearable=True, options=get_accounts_list('new'))],
+                                            clearable=True, options=get_accounts_list('multi'))],
                      ),
             html.Div(style={'display': 'inline-block', 'padding': '5px 20px 0 20px'},
                      children=[dcc.Input(id='account-input', type='text', style={'display': 'inline-block'},
@@ -108,10 +119,18 @@ configurations_sidebar = html.Div(
             dbc.Modal(id="transaction-modal", is_open=False, children=[
                 dbc.ModalHeader(dbc.ModalTitle("Add New Transaction")),
                 dbc.ModalBody(children=[
-                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
+                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 30px 0 0'},
                              children=['Transaction Date', html.Span(" *", style={"color": "red"}), html.Br(),
                                        dcc.DatePickerSingle(
                                            id='transaction-date',
+                                           min_date_allowed=date(2000, 1, 1),
+                                           max_date_allowed=date.today(),
+                                           initial_visible_month=date.today(),
+                                       )]),
+                    html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '0 5px 0 0'},
+                             children=['Posted Date', html.Br(),
+                                       dcc.DatePickerSingle(
+                                           id='posted-date',
                                            min_date_allowed=date(2000, 1, 1),
                                            max_date_allowed=date.today(),
                                            initial_visible_month=date.today(),
@@ -163,34 +182,38 @@ configurations_sidebar = html.Div(
         ]),
     ])
 
+# Output('filter-dropdown', 'options'),
+
 
 @callback(
     Output('current-config-memory', 'data'),
-    Output('field-dropdown', 'value'),
+    Output('cat-row', 'style'),
+    Output('acc-row', 'style'),
     Output('time-dropdown', 'value'),
     Output('sort-dropdown', 'value'),
-    Output('filter-dropdown', 'options'),
     Output('date-range', 'style'),
 
     Input('field-dropdown', 'value'),
     Input('time-dropdown', 'value'),
-    Input('filter-dropdown', 'value'),
+    Input('cat-filter-dropdown', 'value'),
+    Input('acc-filter-dropdown', 'value'),
     Input('sort-dropdown', 'value'),
     Input('current-config-memory', 'data'),
     Input('date-range', 'start_date'),
     Input('date-range', 'end_date'),
-    Input('pie-button', 'n_clicks'),
     Input('bar-button', 'n_clicks'),
+    Input('pie-button', 'n_clicks'),
     Input('time-button', 'n_clicks'),
 )
-def update_parameters(field_filter, time_filter, filter_values, sort_filter, curr_params, start_date, end_date, bar_button, pie_button, time_button):
+def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_filter, current_params, start_date, end_date, bar_button, pie_button, time_button):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
-        field_filter: Category filter
+        field_filter: List of Category and/or Account filter
         time_filter: Time window filter
-        filter_values: Filter to apply to transaction categories or accounts
-        curr_params: Dictionary of current parameters
+        cat_filter: Filter to apply to transaction categories
+        acc_filter: Filter to apply to transaction accounts
+        current_params: Dictionary of current parameters
         end_date: end date of time window to show
         start_date: start date of time window to show
 
@@ -200,12 +223,13 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     # Determine what triggered the parameter update
     trigger = dash.callback_context.triggered[0]['prop_id']
 
+    # Save copy of params
     # Initialize params dict
-    if curr_params is None:
-        curr_params = zero_params_dict()
-    new_params = curr_params
+    if current_params is None:
+        current_params = zero_params_dict()
+    new_params = current_params
 
-    if curr_params['time_filter'] == 'Custom':
+    if current_params['time_filter'] == 'Custom':
         date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     else:
         date_range_style = {'display': 'none'}
@@ -253,21 +277,27 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
         new_params['sort_filter'] = sort_filter
 
     elif trigger == 'pie-button.n_clicks':
-        curr_params['plot_type'] = 'pie'
+        current_params['plot_type'] = 'pie'
     elif trigger == 'bar-button.n_clicks':
-        curr_params['plot_type'] = 'bar'
+        current_params['plot_type'] = 'bar'
     elif trigger == 'time-button.n_clicks':
-        curr_params['plot_type'] = 'time'
+        current_params['plot_type'] = 'time'
 
-    if new_params['field_filter'] == 'Account Name':
-        filter_dropdown = get_accounts_list()
-    else:
-        filter_dropdown = MD.get_categories_list()
+    # Update which filter dropdown to display
+    account_style = {'display': 'none'}
+    cat_style = {'display': 'none'}
+    if 'Account Name' in new_params['field_filter']:
+        account_style = None  # let it use the default display
+    if 'Category' in new_params['field_filter']:
+        cat_style = None
 
-    if trigger == 'filter-dropdown.value':
-        new_params['filter_value'] = filter_values
+    # Save filter values
+    if trigger == 'cat-filter-dropdown.value':
+        new_params['filter_value']['Category'] = cat_filter
+    if trigger == 'acc-filter-dropdown.value':
+        new_params['filter_value']['Account Name'] = acc_filter
 
-    return new_params, new_params['field_filter'], new_params['time_filter'], new_params['sort_filter'], filter_dropdown, date_range_style
+    return new_params, cat_style, account_style, new_params['time_filter'], new_params['sort_filter'], date_range_style
 
 
 @callback(
@@ -293,6 +323,7 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     Input('modal-category-dropdown', 'value'),
     Input('transaction-value-input', 'value'),
     Input('transaction-date', 'date'),
+    Input('posted-date', 'date'),
     Input('description-input', 'value'),
     Input('modal-account-dropdown', 'value'),
     Input('modal-account-input', 'value'),
@@ -300,7 +331,7 @@ def update_parameters(field_filter, time_filter, filter_values, sort_filter, cur
     Input('note-input', 'value'),
     prevent_initial_call=True,
 )
-def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, description, account, new_account, new_category, note):
+def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, p_date, description, account, new_account, new_category, note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     update_tab = no_update
@@ -336,7 +367,13 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
                     msg_str = dbc.Alert("You must specify an account.", color="danger")
                 else:
                     account = new_account
-            MD.add_one_transaction(category, amount, t_date, description, account, note)
+
+            if t_date is None:
+                t_date = p_date
+            elif p_date is None:
+                p_date = t_date
+
+            MD.add_one_transaction(category, amount, t_date, p_date, description, account, note)
             if new_account:
                 MD.add_account(new_account)
             if new_category:
@@ -415,6 +452,8 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         # If it's a new account name, note that
         if account == 'Add new account...':
             account = new_account
+        elif account == 'Multiple accounts...':
+            account = None
 
         # Parse the data
         msg = []
@@ -429,6 +468,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                 continue
 
             try:
+                print(f"\nLoading {account} transactions...")
                 results = MD.load_transactions(m, account)
 
                 # If the results were successful, reset the upload center and update the tab
@@ -453,9 +493,9 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                         account_input = {'display': 'inline-block', 'width': '100%'}
                     upload_button = False
 
-            except Exception:
+            except Exception as e:
                 # Give a second chance to upload the file
-                msg.append(f"File {i + 1} Error: Could not parse transactions")
+                msg.append(f"File {i + 1} Error: Could not parse transactions. ({e})")
                 msg.append(html.Br())
                 if account_dropdown_value == 'Add new account...':
                     account_input = {'display': 'inline-block', 'width': '100%'}
@@ -465,7 +505,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
         account_input = {'display': 'inline-block', 'width': '100%'}
         upload_button = False
 
-    return msg, upload_button, account_input, new_account, get_accounts_list('new'), account_dropdown_value, update_tab
+    return msg, upload_button, account_input, new_account, get_accounts_list('multi'), account_dropdown_value, update_tab
 
 
 @callback(

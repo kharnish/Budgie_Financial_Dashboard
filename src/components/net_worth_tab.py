@@ -66,7 +66,7 @@ def make_net_worth_plot(conf_dict):
         val_dict = {}
         initial_net_worth = accounts['initial balance'].sum()
         for end_day in days:
-            this_month = transactions[transactions['date'].dt.date < end_day]
+            this_month = transactions[transactions['posted date'].dt.date <= end_day]
             net_worth.append(this_month['amount'].sum() + initial_net_worth)
             for acc in get_accounts_list():
                 acc_status = accounts[accounts['account name'] == acc]

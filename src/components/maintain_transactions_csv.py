@@ -20,8 +20,8 @@ class BudgieDF(pd.DataFrame):
             return self
         else:
             try:  # First check for date filter
-                dates = value_filter.pop('date')
-                temp = self[(self['date'] >= dates['$gte']) & (self['date'] <= dates['$lte'])]
+                dates = value_filter.pop('posted date')
+                temp = self[(self['posted date'] >= dates['$gte']) & (self['posted date'] <= dates['$lte'])]
             except KeyError:
                 temp = self
 

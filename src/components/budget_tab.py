@@ -291,8 +291,8 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
                 budget_value += MD.get_budget_amount(child_cat)
                 # Query all transactions to get the average spent per all child categories
                 transactions = pd.concat([transactions, pd.DataFrame(MD.transactions_table.find({
-                    'date': {'$gte': datetime.today() - timedelta(days=180),
-                             '$lte': datetime.today()},
+                    'posted date': {'$gte': datetime.today() - timedelta(days=180),
+                                    '$lte': datetime.today()},
                     'category': child_cat}))])
             num_text = 'Budget group amount:'
             input_disabled = True
@@ -305,8 +305,8 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
                 budget_value = None
             # Query all transactions to get the average spent per the categories specified
             transactions = pd.DataFrame(MD.transactions_table.find({
-                'date': {'$gte': datetime.today() - timedelta(days=180),
-                         '$lte': datetime.today()},
+                'posted date': {'$gte': datetime.today() - timedelta(days=180),
+                                '$lte': datetime.today()},
                 'category': budget_category}))
 
         # Check if value exists, if so, give option to delete it

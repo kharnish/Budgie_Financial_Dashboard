@@ -17,8 +17,9 @@ def make_table(conf_dict):
     """
     transactions = MD.query_transactions(conf_dict)
     transactions.loc[:, '_id'] = [str(tid) for tid in transactions['_id']]
-    transactions = transactions.sort_values('date', ascending=False)
-    transactions['date'] = transactions['date'].dt.strftime('%m-%d-%Y')
+    transactions = transactions.sort_values('posted date', ascending=False)
+    transactions['transaction date'] = transactions['transaction date'].dt.strftime('%m-%d-%Y')
+    transactions['posted date'] = transactions['posted date'].dt.strftime('%m-%d-%Y')
     data = transactions.to_dict('records')
     columns = [{"field": i} for i in transactions.columns]
 
@@ -42,11 +43,15 @@ def make_table(conf_dict):
             col['editable'] = True
         elif col['field'] == 'account name':
             col['width'] = 300
-        elif col['field'] == 'date':
+        elif col['field'] == 'posted date':
+            col['filter'] = 'agDateColumnFilter'
+            col['width'] = 150
+        elif col['field'] == 'transaction date':
             col['checkboxSelection'] = True
             col['headerCheckboxSelection'] = True
             col['headerCheckboxSelectionFilteredOnly'] = True
             col['filter'] = 'agDateColumnFilter'
+            col['width'] = 175
         elif col['field'] == 'notes':
             col['editable'] = True
     return {'data': data, 'columns': columns}
@@ -64,10 +69,19 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                      dbc.Modal(id="edit-modal", is_open=False, children=[
                          dbc.ModalHeader(dbc.ModalTitle("Edit Transactions")),
                          dbc.ModalBody(children=[
-                             html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                             html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 30px 0 0'},
                                       children=['New Transaction Date:', html.Br(),
                                                 dcc.DatePickerSingle(
                                                     id='new-transaction-date',
+                                                    min_date_allowed=date(2000, 1, 1),
+                                                    max_date_allowed=date.today(),
+                                                    initial_visible_month=date.today(),
+                                                    placeholder='New date...'
+                                                )]),
+                             html.Div(style={'display': 'inline-block', 'width': 'auto', 'padding': '5px 0'},
+                                      children=['New Posted Date:', html.Br(),
+                                                dcc.DatePickerSingle(
+                                                    id='new-posted-date',
                                                     min_date_allowed=date(2000, 1, 1),
                                                     max_date_allowed=date.today(),
                                                     initial_visible_month=date.today(),
@@ -110,6 +124,7 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
 
                      html.Div(style={'padding': '10px 15px 0 0', 'float': 'right'}, id='help-transactions',
                               children=[html.I(className="fa-solid fa-circle-question")]),
+
                      dbc.Modal(id="transactions-help", is_open=False, children=[
                          dbc.ModalHeader(dbc.ModalTitle("Transactions Help")),
                          dbc.ModalBody(children=['The Transactions tab allows you to see and edit your individual transactions.', html.Br(), html.Br(),
@@ -118,6 +133,8 @@ transaction_tab = dcc.Tab(label="Transactions", value='Transactions', children=[
                                                  'Shift + click to select a range of transactions, or ctrl + click to select multiple individual transactions. '
                                                  'Press the space bar to undo/redo your selection.'
                                                  ])]),
+
+                     html.Div(style={'padding': '10px 50px 0 0', 'float': 'right'}, id='transactions-stats', children=[]),
 
                      dag.AgGrid(id="transactions-table",
                                 style={"height": '600px'},
@@ -150,14 +167,22 @@ def update_table_data(change_data):
     Output('new-category-input', 'style'),
     Output('new-category-input', 'value'),
     Output('new-category-dropdown', 'options'),
+    Output('new-category-dropdown', 'placeholder'),
     Output('new-transaction-value', 'value'),
+    Output('new-transaction-value', 'placeholder'),
     Output('new-transaction-date', 'date'),
+    Output('new-transaction-date', 'placeholder'),
+    Output('new-posted-date', 'date'),
+    Output('new-posted-date', 'placeholder'),
     Output('new-description-input', 'value'),
+    Output('new-description-input', 'placeholder'),
     Output('new-account-dropdown', 'value'),
     Output('new-account-input', 'style'),
     Output('new-account-input', 'value'),
+    Output('new-account-dropdown', 'placeholder'),
     Output('new-modal-text', 'children'),
     Output('new-note-input', 'value'),
+    Output('transactions-stats', 'children'),
     Output('update-tab', 'data', allow_duplicate=True),
 
     Input('transact-edit', 'n_clicks'),
@@ -169,13 +194,14 @@ def update_table_data(change_data):
     Input('new-category-input', 'value'),
     Input('new-transaction-value', 'value'),
     Input('new-transaction-date', 'date'),
+    Input('new-posted-date', 'date'),
     Input('new-description-input', 'value'),
     Input('new-account-dropdown', 'value'),
     Input('new-account-input', 'value'),
     Input('new-note-input', 'value'),
     prevent_initial_call=True,
 )
-def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, category, new_category, amount, t_date, description, account, new_account, new_note):
+def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, category, new_category, amount, t_date, p_date, description, account, new_account, new_note):
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     is_open = False
@@ -192,6 +218,21 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
     else:
         account_style = {'display': 'none'}
 
+    if len(row_data) == 1:
+        ph_transaction = row_data[0]['transaction date']
+        ph_posted = row_data[0]['posted date']
+        ph_account = row_data[0]['account name']
+        ph_amount = f"$ {row_data[0]['amount']}"
+        ph_description = row_data[0]['description']
+        ph_category = row_data[0]['category']
+    else:
+        ph_transaction = 'New Date'
+        ph_posted = 'New Date'
+        ph_account = 'New Account'
+        ph_amount = '$ 0'
+        ph_category = 'New Category'
+        ph_description = 'New Transaction Description'
+
     if trigger == 'transactions-table.selectedRows' and (row_data is None or len(row_data) > 0):
         enabled = False
 
@@ -201,10 +242,13 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
 
     elif trigger == 'transact-edit.n_clicks':
         is_open = True
+
     elif trigger == 'n-modal-submit.n_clicks':
         update_dict = {}
         if t_date is not None:
-            update_dict['date'] = t_date
+            update_dict['transaction date'] = t_date
+        if p_date is not None:
+            update_dict['posted date'] = p_date
         if account is not None:
             if account == 'Add new account...':
                 if new_account is None:
@@ -269,8 +313,14 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
         new_account = None
         new_note = None
 
-    return enabled, enabled, is_open, category, cat_style, new_category, MD.get_categories_list('new'), amount, t_date, description, account, \
-        account_style, new_account, msg_str, new_note, update_tab
+    if len(row_data) > 0:
+        amounts = [rd['amount'] for rd in row_data]
+        transaction_stats = [html.B(len(row_data)), ' row(s) selected. ', ' ', ' Total Value: ', html.B(f"$ {sum(amounts):.2f}")]
+    else:
+        transaction_stats = []
+
+    return enabled, enabled, is_open, category, cat_style, new_category, MD.get_categories_list('new'), ph_category, amount, ph_amount, t_date, ph_transaction, p_date, ph_posted, \
+        description, ph_description, account, account_style, new_account, ph_account, msg_str, new_note, transaction_stats, update_tab
 
 
 @callback(
