@@ -6,7 +6,7 @@ import sys
 import pandas as pd
 import uuid
 
-from components.maintain_transactions import MaintainDatabase, EMPTY_TRANSACTION
+from components.maintain_database import MaintainDatabase, EMPTY_TRANSACTION
 
 
 class BudgieDF(pd.DataFrame):
