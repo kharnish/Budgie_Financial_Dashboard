@@ -62,7 +62,7 @@ def zero_params_dict():
     """
     today = date.today()
     start_of_month = date(today.year, today.month, 1)
-    return {'field_filter': 'Category', 'time_filter': 'This Month', 'sort_filter': 'Category', 'filter_value': [], 'plot_type': 'bar',
+    return {'field_filter': [], 'time_filter': 'This Month', 'sort_filter': 'Category', 'filter_value': {'Category': [], 'Account Name': []}, 'plot_type': 'bar',
             'start_date': datetime.strftime(start_of_month, '%Y-%m-%d'), 'end_date': datetime.strftime(today, '%Y-%m-%d')}
 
 
