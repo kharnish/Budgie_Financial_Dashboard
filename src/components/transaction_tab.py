@@ -269,6 +269,7 @@ def bulk_update_table(edit_button, delete_button, row_data, cancel, submit, cate
                     msg_str = dbc.Alert("You must specify a transaction category.", color="danger")
                 else:
                     update_dict['category'] = new_category
+                    MD.add_category(new_category)
             else:
                 update_dict['category'] = category
         if new_note is not None:

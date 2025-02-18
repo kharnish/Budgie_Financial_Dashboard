@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 import os
 import sys
 
-from components.maintain_transactions import MaintainDatabase
+from components.maintain_database import MaintainDatabase
 from components.maintain_transactions_csv import MaintainCSV
 
 EXCLUDE_FROM_TABLE = ['_id', 'original description']

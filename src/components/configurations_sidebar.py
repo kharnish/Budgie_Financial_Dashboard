@@ -33,7 +33,7 @@ configurations_sidebar = html.Div(
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='cat-filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
-                                                 options=MD.get_categories_list(),
+                                                 options=MD.get_categories_list('parent'),
                                                  )
                                     ]
                                    ),

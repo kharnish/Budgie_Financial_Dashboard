@@ -254,7 +254,7 @@ class MaintainDatabase:
         """Query Mongo according to configuration dict parameters
 
         Args:
-             conf_dict:
+            conf_dict: Dictionary of the configuration parameters.
 
         Returns: Pandas Dataframe of transactions
         """
@@ -265,6 +265,12 @@ class MaintainDatabase:
             for val in conf_dict['field_filter']:
                 if len(conf_dict['filter_value'][val]) > 0:
                     mongo_filter[val.lower()] = {'$in': conf_dict['filter_value'][val]}
+
+        # If filtering by category, include parent as well
+        try:
+            mongo_filter['category']['$in'].extend(self.get_children_categories_list(conf_dict['filter_value'][val]))
+        except KeyError:
+            pass
 
         transactions = pd.DataFrame(self.transactions_table.find({
             'posted date': {
@@ -438,7 +444,13 @@ class MaintainDatabase:
         return cat_list
 
     def get_children_categories_list(self, parent=None):
-        return [item['category name'] for item in list(self.categories_table.find({'parent': parent}))]
+        if isinstance(parent, list):
+            children = []
+            for par in parent:
+                children.extend([item['category name'] for item in list(self.categories_table.find({'parent': par}))])
+            return children
+        else:
+            return [item['category name'] for item in list(self.categories_table.find({'parent': parent}))]
 
     def get_hide_from_trends(self):
         """Get list of all categories hidden from trends"""
