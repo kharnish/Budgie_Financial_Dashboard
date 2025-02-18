@@ -31,7 +31,7 @@ configurations_sidebar = html.Div(
                 children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Category Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
-                          children=[dcc.Dropdown(id='category-dropdown', maxHeight=400, clearable=True,
+                          children=[dcc.Dropdown(id='cat-filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
                                                  options=MD.get_categories_list(),
                                                  )
@@ -42,16 +42,16 @@ configurations_sidebar = html.Div(
                 children=[html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
                           children=['Account Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
-                          children=[dcc.Dropdown(id='account-dropdown', maxHeight=400, clearable=True,
+                          children=[dcc.Dropdown(id='acc-filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
                                                  options=get_accounts_list(),
                                                  )
                                     ]
                                    ),
                           ]),
-        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '10px 20px'},
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '30px 20px 10px 20px'},
                           children=["Sort By"]),
-                html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '20px 0 10px 0',
                                 'vertical-align': 'middle'},
                          children=[dcc.Dropdown(id='sort-dropdown', value=zero_params_dict()['field_filter'],
                                                 clearable=False, searchable=False, className='dropdown',
@@ -60,10 +60,9 @@ configurations_sidebar = html.Div(
                                    ]
                          ),
                  ]),
-
-        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px'},
+        dbc.Row([html.Div(style={'width': '35%', 'display': 'inline-block', 'padding': '11px 20px 5px 20px'},
                           children=['Time Window']),
-                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0px',
+                 html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0',
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
                                                  clearable=False, searchable=False, className='dropdown',
@@ -188,16 +187,16 @@ configurations_sidebar = html.Div(
 
 @callback(
     Output('current-config-memory', 'data'),
-    # Output('cat-row', 'style'),
-    # Output('acc-row', 'style'),
+    Output('cat-row', 'style'),
+    Output('acc-row', 'style'),
     Output('time-dropdown', 'value'),
     Output('sort-dropdown', 'value'),
     Output('date-range', 'style'),
 
     Input('field-dropdown', 'value'),
     Input('time-dropdown', 'value'),
-    Input('category-dropdown', 'value'),
-    Input('account-dropdown', 'value'),
+    Input('cat-filter-dropdown', 'value'),
+    Input('acc-filter-dropdown', 'value'),
     Input('sort-dropdown', 'value'),
     Input('current-config-memory', 'data'),
     Input('date-range', 'start_date'),
@@ -206,7 +205,7 @@ configurations_sidebar = html.Div(
     Input('pie-button', 'n_clicks'),
     Input('time-button', 'n_clicks'),
 )
-def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_filter, curr_params, start_date, end_date, bar_button, pie_button, time_button):
+def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_filter, current_params, start_date, end_date, bar_button, pie_button, time_button):
     """Update current parameter dictionary and visible parameters based on selected bit or manual changes.
 
     Args:
@@ -214,7 +213,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
         time_filter: Time window filter
         cat_filter: Filter to apply to transaction categories
         acc_filter: Filter to apply to transaction accounts
-        curr_params: Dictionary of current parameters
+        current_params: Dictionary of current parameters
         end_date: end date of time window to show
         start_date: start date of time window to show
 
@@ -225,9 +224,12 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
     trigger = dash.callback_context.triggered[0]['prop_id']
 
     # Save copy of params
-    new_params = curr_params
+    # Initialize params dict
+    if current_params is None:
+        current_params = zero_params_dict()
+    new_params = current_params
 
-    if curr_params['time_filter'] == 'Custom':
+    if current_params['time_filter'] == 'Custom':
         date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
     else:
         date_range_style = {'display': 'none'}
@@ -275,11 +277,11 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
         new_params['sort_filter'] = sort_filter
 
     elif trigger == 'pie-button.n_clicks':
-        curr_params['plot_type'] = 'pie'
+        current_params['plot_type'] = 'pie'
     elif trigger == 'bar-button.n_clicks':
-        curr_params['plot_type'] = 'bar'
+        current_params['plot_type'] = 'bar'
     elif trigger == 'time-button.n_clicks':
-        curr_params['plot_type'] = 'time'
+        current_params['plot_type'] = 'time'
 
     # Update which filter dropdown to display
     account_style = {'display': 'none'}
@@ -290,13 +292,12 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
         cat_style = None
 
     # Save filter values
-    if trigger == 'cat-filter.value':
-        new_params['filter_value']['category'] = cat_filter
-    if trigger == 'acc-filter.value':
-        new_params['filter_value']['account'] = acc_filter
+    if trigger == 'cat-filter-dropdown.value':
+        new_params['filter_value']['Category'] = cat_filter
+    if trigger == 'acc-filter-dropdown.value':
+        new_params['filter_value']['Account Name'] = acc_filter
 
-    # return new_params, account_style, cat_style, new_params['time_filter'], new_params['sort_filter'], date_range_style
-    return new_params, new_params['time_filter'], new_params['sort_filter'], date_range_style
+    return new_params, cat_style, account_style, new_params['time_filter'], new_params['sort_filter'], date_range_style
 
 
 @callback(

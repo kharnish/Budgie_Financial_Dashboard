@@ -178,7 +178,8 @@ class MaintainDatabase:
                         # It's a match for amount and description but not date, so check if it updated a pending transaction
                         # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
                         if abs((dup['posted date'] - row['posted date'])) > timedelta(days=7):
-                            print(f"Possible repeating transaction: New: {row['posted date']}, {row['original description']} \n "
+                            print(f"Possible repeating transaction:  \n"
+                                  f"         New: {row['posted date']}, {row['original description']} \n"
                                   f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             if row['posted date'] - now > timedelta(days=30):
@@ -257,10 +258,13 @@ class MaintainDatabase:
 
         Returns: Pandas Dataframe of transactions
         """
-        if len(conf_dict['filter_value']['category']) == 0 and len(conf_dict['filter_value']['account']) == 0:
+        if len(conf_dict['filter_value']['Category']) == 0 and len(conf_dict['filter_value']['Account Name']) == 0:
             mongo_filter = {}
         else:
-            mongo_filter = {conf_dict['field_filter'].lower(): {'$in': conf_dict['filter_value']}}
+            mongo_filter = {}
+            for val in conf_dict['field_filter']:
+                if len(conf_dict['filter_value'][val]) > 0:
+                    mongo_filter[val.lower()] = {'$in': conf_dict['filter_value'][val]}
 
         transactions = pd.DataFrame(self.transactions_table.find({
             'posted date': {

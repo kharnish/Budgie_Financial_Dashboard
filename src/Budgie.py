@@ -90,10 +90,6 @@ def update_tab_data(current_params, which_tab, update_tab):
 
     """
     if which_tab == 'Trends':
-        # Initialize params dict
-        if current_params is None:
-            current_params = zero_params_dict()
-
         try:
             tab_dict = make_table(zero_params_dict())
         except Exception as e:
