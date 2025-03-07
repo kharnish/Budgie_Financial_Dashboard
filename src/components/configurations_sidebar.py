@@ -391,7 +391,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify all values.", color="danger")
-    elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'description-input.value',
+    elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'posted-date.date', 'description-input.value',
                      'modal-account-dropdown.value', 'modal-account-input.value', 'modal-category-input.value', 'note-input.value']:
         is_open = True
     else:

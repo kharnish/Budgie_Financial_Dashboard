@@ -406,7 +406,6 @@ class MaintainDatabase:
         """Update category data based on edits in Categories table"""
         new_dict = change_dict['data']
         new_dict.pop('_id')
-        new_dict.pop('parent')  # TODO this is a quick fix that will need to be updated when it actually uses parents more
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']
         if old_dict['category name'] != change_dict['data']['category name']:
