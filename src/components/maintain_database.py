@@ -49,6 +49,8 @@ class MaintainDatabase:
 
     def _add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
+        debug = False  # Option to print more robust debug statements
+    
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
@@ -142,7 +144,7 @@ class MaintainDatabase:
         # Add all non-duplicate transactions to database
         transaction_list = []
         now = datetime.now()
-        for i, row in df.iterrows():
+        for i, row in df.iterrows():           
             if account_labels:
                 account = row['account name']
 
@@ -162,41 +164,56 @@ class MaintainDatabase:
 
                     if dup['posted date'] > row['posted date']:
                         continue
+
+                    # Check various parameters to see if it's a duplicate or not
                     if dup['posted date'] == row['posted date']:
-                        if dup['original description'] == row['original description']:
-                            # It's an exact match for amount, description, and date, so definitely a duplicate
-                            break
-                        else:
-                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.1)
-                            if matches:
-                                break
+                        if debug:
+                            if dup['transaction date'] == row['transaction date']:
+                                # Exact match for posted and transaction date, and amount is good enough for me
+                                # but keep extra options if you need to debug
+                                if dup['original description'] == row['original description']:
+                                    # It's an exact match for amount, description, and date, so definitely a duplicate
+                                    break
+                                else:
+                                    print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
+                                          f"       New: {row['posted date']}, {row['original description']}\n"
+                                          f"  Existing: {dup['posted date']}, {dup['original description']}")
+                                    break
                             else:
-                                print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
-                                      f"    New: {row['posted date']}, {row['original description']} / Existing: {dup['posted date']}, {dup['original description']}")
+                                # So far, exact match for posted date and amount, so check transaction date and description
+                                print(f"Did not insert possible duplicate transaction, but check different transaction date and description:\n"
+                                      f"    Posted: {row['posted date']}, ${dup['amount']:.2f} \n"
+                                      f"       New: {row['transaction date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['transaction date']}, {dup['original description']}")
                                 break
                     else:
-                        # It's a match for amount and description but not date, so check if it updated a pending transaction
-                        # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
-                        if abs((dup['posted date'] - row['posted date'])) > timedelta(days=7):
-                            print(f"Possible repeating transaction:  \n"
-                                  f"         New: {row['posted date']}, {row['original description']} \n"
-                                  f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
+                        if dup['transaction date'] == row['transaction date']:
+                            # It's a match for amount and transaction date, but not posted date, so check description
+                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
+                            if matches:
+                                print(f"Did not insert possible duplicate item: ${dup['amount']:.2f}\n"
+                                      f"       New: {row['posted date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['posted date']}, {dup['original description']}")
+                                break
+                            else:
+                                transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                                if row['posted date'] - now > timedelta(days=30):
+                                    print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
+                                print(f"Inserted potential duplicate item: ${dup['amount']:.2f}\n"
+                                      f"       New: {row['posted date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['posted date']}, {dup['original description']}")
+                                break
+
+                        else:
+                            # Neither posted nor transaction dates match, so not a duplicate
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             if row['posted date'] - now > timedelta(days=30):
                                 print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
-                            break
-                        # else:
-                        #     matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
-                        #     if matches:
-                        #         break
-                        #     else:
-                        #         print(f"Did not insert possible duplicate item: New: {row['posted date']}, {row['original description']} / "
-                        #               f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
-                        #         break
+
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
-                if row['posted date'] - now > timedelta(days=30):
+                if (row['posted date'] - now) > timedelta(days=30):
                     print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
 
         return transaction_list
