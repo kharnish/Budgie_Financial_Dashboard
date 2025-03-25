@@ -87,17 +87,32 @@ def make_net_worth_plot(conf_dict):
         recent_pos = recent_worth[average_worth >= 0].sort_values(ascending=False)
         recent_neg = recent_worth[average_worth < 0].sort_values(ascending=True)
 
+        # Determine if the accounts are filtered
+        if len(conf_dict['filter_value']['Account Name']) > 0:
+            filter = True
+        else:
+            filter = False
+
         # Plot the account and overall net worth data
-        # trace = 0
         for acc in recent_neg.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
+            visible = True
+            if filter:
+                if acc not in conf_dict['filter_value']['Account Name']:
+                    visible = 'legendonly'
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', visible=visible,  # fillcolor=get_color(trace),
                                          stackgroup='one', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
-            # trace += 1
         for acc in recent_pos.index:
-            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty',  # fillcolor=get_color(trace),
+            visible = True
+            if filter:
+                if acc not in conf_dict['filter_value']['Account Name']:
+                    visible = 'legendonly'
+            fig_obj.add_trace(go.Scatter(x=days, y=val_df[acc], name=acc, mode='none', fill='tonexty', visible=visible,  # fillcolor=get_color(trace),
                                          stackgroup='two', meta=acc, hovertemplate="%{meta}<br>%{x}<br>$%{y:,.2f}<extra></extra>"))
-            # trace += 1
-        fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines',
+        if filter:
+            visible = 'legendonly'
+        else:
+            visible = True
+        fig_obj.add_trace(go.Scatter(x=days, y=net_worth, name='Net Worth', mode='markers+lines', visible=visible,
                                      marker={'color': 'black', 'size': 10}, line={'color': 'black', 'width': 3},
                                      hovertemplate="%{x}<br>$%{y:,.2f}<extra></extra>"))
 
