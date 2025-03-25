@@ -93,7 +93,7 @@ def make_net_worth_plot(conf_dict):
         else:
             filter = False
 
-        # Plot the account and overall net worth data
+        # Plot the account and overall net worth data, and filter account
         for acc in recent_neg.index:
             visible = True
             if filter:

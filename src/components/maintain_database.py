@@ -50,7 +50,7 @@ class MaintainDatabase:
     def _add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
         debug = False  # Option to print more robust debug statements
-    
+
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
@@ -144,7 +144,7 @@ class MaintainDatabase:
         # Add all non-duplicate transactions to database
         transaction_list = []
         now = datetime.now()
-        for i, row in df.iterrows():           
+        for i, row in df.iterrows():
             if account_labels:
                 account = row['account name']
 
