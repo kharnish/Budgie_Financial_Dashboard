@@ -122,9 +122,12 @@ class MaintainDatabase:
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
 
-        # Category in CSV
-        if 'category' not in df.columns or account:
-            df['category'] = ''
+        # Add blank category column if there is none, but keep it default if loading an exported Budgie CSV
+        if account is not None:
+            if 'account name' in df.columns:
+                pass
+            else:
+                df['category'] = ''
 
         # Replace NA with empty string and remove transactions with no date
         df = df.fillna('')
@@ -166,7 +169,7 @@ class MaintainDatabase:
                         continue
 
                     # Check various parameters to see if it's a duplicate or not
-                    if dup['posted date'] == row['posted date']:
+                    if dup['posted date'] == row['posted date']:  # Matching amount, posted date, and account are good enough to declare duplicate
                         if debug:
                             if dup['transaction date'] == row['transaction date']:
                                 # Exact match for posted and transaction date, and amount is good enough for me
@@ -186,6 +189,7 @@ class MaintainDatabase:
                                       f"       New: {row['transaction date']}, {row['original description']}\n"
                                       f"  Existing: {dup['transaction date']}, {dup['original description']}")
                                 break
+                        break
                     else:
                         if dup['transaction date'] == row['transaction date']:
                             # It's a match for amount and transaction date, but not posted date, so check description
@@ -209,6 +213,7 @@ class MaintainDatabase:
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             if row['posted date'] - now > timedelta(days=30):
                                 print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
+                            break
 
             else:
                 # There's no match, so get the category and add the transaction
