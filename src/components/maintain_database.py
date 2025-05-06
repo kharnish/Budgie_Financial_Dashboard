@@ -169,10 +169,10 @@ class MaintainDatabase:
                         continue
 
                     # Check various parameters to see if it's a duplicate or not
-                    if dup['posted date'] == row['posted date']:  # Matching amount, posted date, and account are good enough to declare duplicate
+                    if dup['posted date'] == row['posted date']:
+                        # Matching amount, posted date, and account are good enough to declare duplicate
                         if debug:
                             if dup['transaction date'] == row['transaction date']:
-                                # Exact match for posted and transaction date, and amount is good enough for me
                                 # but keep extra options if you need to debug
                                 if dup['original description'] == row['original description']:
                                     # It's an exact match for amount, description, and date, so definitely a duplicate
@@ -439,29 +439,33 @@ class MaintainDatabase:
 
         Parameter to add an additional "Add new category..." option
         """
-        cat_list = []
-        if extra == 'new':
-            cat_list = list(self.transactions_table.find().distinct('category'))
-            cat_list.extend(['Add new category...'])
-        elif extra == 'parent':
-            cat_list = list(self.transactions_table.find().distinct('category'))
-            cat_list.extend(list(self.categories_table.find().distinct('parent')))
-            # Remove NANs to allow for sorting strings
-            try:
-                cat_list.remove(None)
-            except ValueError:
-                pass
-            cat_list = sorted(cat_list)
-        elif extra == 'parent_only':
-            cat_list = list(self.categories_table.find().distinct('parent'))
-            # Remove NANs to allow for sorting strings
-            try:
-                cat_list.remove(None)
-            except ValueError:
-                pass
-            cat_list = sorted(cat_list)
-        else:
-            cat_list.extend(self.transactions_table.find().distinct('category'))
+        try:
+            cat_list = []
+            if extra == 'new':
+                cat_list = list(self.transactions_table.find().distinct('category'))
+                cat_list.extend(['Add new category...'])
+            elif extra == 'parent':
+                cat_list = list(self.transactions_table.find().distinct('category'))
+                cat_list.extend(list(self.categories_table.find().distinct('parent')))
+                # Remove NANs to allow for sorting strings
+                try:
+                    cat_list.remove(None)
+                except ValueError:
+                    pass
+                cat_list = sorted(cat_list)
+            elif extra == 'parent_only':
+                cat_list = list(self.categories_table.find().distinct('parent'))
+                # Remove NANs to allow for sorting strings
+                try:
+                    cat_list.remove(None)
+                except ValueError:
+                    pass
+                cat_list = sorted(cat_list)
+            else:
+                cat_list.extend(self.transactions_table.find().distinct('category'))
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print(f"Pymongo Timeout Error: {e}")
+            exit()
         return cat_list
 
     def get_children_categories_list(self, parent=None):

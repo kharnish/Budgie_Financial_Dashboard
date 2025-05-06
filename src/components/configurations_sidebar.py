@@ -66,7 +66,7 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
                                                  clearable=False, searchable=False, className='dropdown',
-                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'This Year', 'Last Year',
+                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'Year To Date', 'Last Year',
                                                           'All Time', 'Custom'],
                                                  )
                                     ],
@@ -256,7 +256,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1) - relativedelta(months=6)
             date_range_style = {'display': 'none'}
-        elif time_filter == 'This Year':
+        elif time_filter == 'Year To Date':
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
             date_range_style = {'display': 'none'}
