@@ -49,6 +49,8 @@ class MaintainDatabase:
 
     def _add_transactions(self, sheet, account=None):
         """Add transactions to a database, ensuring duplicates are not added, and taking special care with Venmo transactions"""
+        debug = False  # Option to print more robust debug statements
+
         if isinstance(sheet, str):
             df = pd.read_csv(sheet)
         else:
@@ -73,6 +75,9 @@ class MaintainDatabase:
             source = df['Funding Source'].replace({'Venmo balance': np.nan})
             if any(~source.isna()):
                 df['notes'] = 'Source: ' + source
+            # Add description if it's a transfer out of Venmo
+            for i in np.argwhere(df['Type'] == 'Standard Transfer'):
+                df.loc[i, 'description'] = f"Transfer to {df.loc[i, 'Destination'].values[0]}"
 
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')
@@ -120,9 +125,12 @@ class MaintainDatabase:
         if not account_labels and not account:
             return 'Error: Must provide account name if not given in CSV'
 
-        # Category in CSV
-        if 'category' not in df.columns or account:
-            df['category'] = ''
+        # Add blank category column if there is none, but keep it default if loading an exported Budgie CSV
+        if account is not None:
+            if 'account name' in df.columns:
+                pass
+            else:
+                df['category'] = ''
 
         # Replace NA with empty string and remove transactions with no date
         df = df.fillna('')
@@ -162,41 +170,58 @@ class MaintainDatabase:
 
                     if dup['posted date'] > row['posted date']:
                         continue
+
+                    # Check various parameters to see if it's a duplicate or not
                     if dup['posted date'] == row['posted date']:
-                        if dup['original description'] == row['original description']:
-                            # It's an exact match for amount, description, and date, so definitely a duplicate
-                            break
-                        else:
-                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.1)
+                        # Matching amount, posted date, and account are good enough to declare duplicate
+                        if debug:
+                            if dup['transaction date'] == row['transaction date']:
+                                # but keep extra options if you need to debug
+                                if dup['original description'] == row['original description']:
+                                    # It's an exact match for amount, description, and date, so definitely a duplicate
+                                    break
+                                else:
+                                    print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
+                                          f"       New: {row['posted date']}, {row['original description']}\n"
+                                          f"  Existing: {dup['posted date']}, {dup['original description']}")
+                                    break
+                            else:
+                                # So far, exact match for posted date and amount, so check transaction date and description
+                                print(f"Did not insert possible duplicate transaction, but check different transaction date and description:\n"
+                                      f"    Posted: {row['posted date']}, ${dup['amount']:.2f} \n"
+                                      f"       New: {row['transaction date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['transaction date']}, {dup['original description']}")
+                                break
+                        break
+                    else:
+                        if dup['transaction date'] == row['transaction date']:
+                            # It's a match for amount and transaction date, but not posted date, so check description
+                            matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
                             if matches:
+                                print(f"Did not insert possible duplicate item: ${dup['amount']:.2f}\n"
+                                      f"       New: {row['posted date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['posted date']}, {dup['original description']}")
                                 break
                             else:
-                                print(f"Did not insert possible duplicate transaction, but check different description: ${dup['amount']:.2f} \n"
-                                      f"    New: {row['posted date']}, {row['original description']} / Existing: {dup['posted date']}, {dup['original description']}")
+                                transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
+                                if row['posted date'] - now > timedelta(days=30):
+                                    print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
+                                print(f"Inserted potential duplicate item: ${dup['amount']:.2f}\n"
+                                      f"       New: {row['posted date']}, {row['original description']}\n"
+                                      f"  Existing: {dup['posted date']}, {dup['original description']}")
                                 break
-                    else:
-                        # It's a match for amount and description but not date, so check if it updated a pending transaction
-                        # If the transaction date is over 7 days from the duplicate, it's probably a recurring and not a duplicate
-                        if abs((dup['posted date'] - row['posted date'])) > timedelta(days=7):
-                            print(f"Possible repeating transaction:  \n"
-                                  f"         New: {row['posted date']}, {row['original description']} \n"
-                                  f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
+
+                        else:
+                            # Neither posted nor transaction dates match, so not a duplicate
                             transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
                             if row['posted date'] - now > timedelta(days=30):
                                 print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
                             break
-                        # else:
-                        #     matches = get_close_matches(row['original description'], [dup['original description']], cutoff=0.35)
-                        #     if matches:
-                        #         break
-                        #     else:
-                        #         print(f"Did not insert possible duplicate item: New: {row['posted date']}, {row['original description']} / "
-                        #               f"    Existing: {dup['posted date']}, {dup['original description']}, ${dup['amount']:.2f}")
-                        #         break
+
             else:
                 # There's no match, so get the category and add the transaction
                 transaction_list.append(self._make_transaction_dict(row, self._autocategorize(row), account))
-                if row['posted date'] - now > timedelta(days=30):
+                if (row['posted date'] - now) > timedelta(days=30):
                     print(f"Inserted transaction from over a month ago: {row['posted date']}, {row['original description']}, ${row['amount']:.2f}")
 
         return transaction_list
@@ -254,7 +279,7 @@ class MaintainDatabase:
         """Query Mongo according to configuration dict parameters
 
         Args:
-             conf_dict:
+            conf_dict: Dictionary of the configuration parameters.
 
         Returns: Pandas Dataframe of transactions
         """
@@ -265,6 +290,12 @@ class MaintainDatabase:
             for val in conf_dict['field_filter']:
                 if len(conf_dict['filter_value'][val]) > 0:
                     mongo_filter[val.lower()] = {'$in': conf_dict['filter_value'][val]}
+
+        # If filtering by category, include parent as well
+        try:
+            mongo_filter['category']['$in'].extend(self.get_children_categories_list(conf_dict['filter_value'][val]))
+        except KeyError:
+            pass
 
         transactions = pd.DataFrame(self.transactions_table.find({
             'posted date': {
@@ -400,7 +431,6 @@ class MaintainDatabase:
         """Update category data based on edits in Categories table"""
         new_dict = change_dict['data']
         new_dict.pop('_id')
-        new_dict.pop('parent')  # TODO this is a quick fix that will need to be updated when it actually uses parents more
         old_dict = change_dict['data'].copy()
         old_dict[change_dict['colId']] = change_dict['oldValue']
         if old_dict['category name'] != change_dict['data']['category name']:
@@ -412,33 +442,43 @@ class MaintainDatabase:
 
         Parameter to add an additional "Add new category..." option
         """
-        cat_list = []
-        if extra == 'new':
-            cat_list = list(self.transactions_table.find().distinct('category'))
-            cat_list.extend(['Add new category...'])
-        elif extra == 'parent':
-            cat_list = list(self.transactions_table.find().distinct('category'))
-            cat_list.extend(list(self.categories_table.find().distinct('parent')))
-            # Remove NANs to allow for sorting strings
-            try:
-                cat_list.remove(None)
-            except ValueError:
-                pass
-            cat_list = sorted(cat_list)
-        elif extra == 'parent_only':
-            cat_list = list(self.categories_table.find().distinct('parent'))
-            # Remove NANs to allow for sorting strings
-            try:
-                cat_list.remove(None)
-            except ValueError:
-                pass
-            cat_list = sorted(cat_list)
-        else:
-            cat_list.extend(self.transactions_table.find().distinct('category'))
+        try:
+            cat_list = []
+            if extra == 'new':
+                cat_list = list(self.transactions_table.find().distinct('category'))
+                cat_list.extend(['Add new category...'])
+            elif extra == 'parent':
+                cat_list = list(self.transactions_table.find().distinct('category'))
+                cat_list.extend(list(self.categories_table.find().distinct('parent')))
+                # Remove NANs to allow for sorting strings
+                try:
+                    cat_list.remove(None)
+                except ValueError:
+                    pass
+                cat_list = sorted(cat_list)
+            elif extra == 'parent_only':
+                cat_list = list(self.categories_table.find().distinct('parent'))
+                # Remove NANs to allow for sorting strings
+                try:
+                    cat_list.remove(None)
+                except ValueError:
+                    pass
+                cat_list = sorted(cat_list)
+            else:
+                cat_list.extend(self.transactions_table.find().distinct('category'))
+        except pymongo.errors.ServerSelectionTimeoutError as e:
+            print(f"Pymongo Timeout Error: {e}")
+            exit()
         return cat_list
 
     def get_children_categories_list(self, parent=None):
-        return [item['category name'] for item in list(self.categories_table.find({'parent': parent}))]
+        if isinstance(parent, list):
+            children = []
+            for par in parent:
+                children.extend([item['category name'] for item in list(self.categories_table.find({'parent': par}))])
+            return children
+        else:
+            return [item['category name'] for item in list(self.categories_table.find({'parent': parent}))]
 
     def get_hide_from_trends(self):
         """Get list of all categories hidden from trends"""

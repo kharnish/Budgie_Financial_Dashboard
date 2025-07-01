@@ -33,7 +33,7 @@ configurations_sidebar = html.Div(
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='cat-filter-dropdown', maxHeight=400, clearable=True,
                                                  searchable=True, className='dropdown', multi=True,
-                                                 options=MD.get_categories_list(),
+                                                 options=MD.get_categories_list('parent'),
                                                  )
                                     ]
                                    ),
@@ -66,7 +66,7 @@ configurations_sidebar = html.Div(
                                  'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='time-dropdown', value=zero_params_dict()['time_filter'], maxHeight=400,
                                                  clearable=False, searchable=False, className='dropdown',
-                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'This Year', 'Last Year',
+                                                 options=['This Month', 'Last Month', 'Last 3 Months', 'Last 6 Months', 'Year To Date', 'Last Year',
                                                           'All Time', 'Custom'],
                                                  )
                                     ],
@@ -234,9 +234,13 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
     else:
         date_range_style = {'display': 'none'}
 
-    # if one of the parameters, change them in the current dict
+    # If one of the parameters, change them in the current dict
     if trigger == 'field-dropdown.value':
         new_params['field_filter'] = field_filter
+        for filter in ['Category', 'Account Name']:
+            if filter not in field_filter:
+                new_params['filter_value'][filter] = []
+
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
         if time_filter == 'This Month':
@@ -256,7 +260,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(new_params['end_date'].year, new_params['end_date'].month, 1) - relativedelta(months=6)
             date_range_style = {'display': 'none'}
-        elif time_filter == 'This Year':
+        elif time_filter == 'Year To Date':
             new_params['end_date'] = date.today()
             new_params['start_date'] = date(new_params['end_date'].year, 1, 1)
             date_range_style = {'display': 'none'}
@@ -270,6 +274,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
             date_range_style = {'display': 'none'}
         elif time_filter == 'Custom':
             date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
+
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date
@@ -391,7 +396,7 @@ def new_transaction_modal(open_modal, cancel, submit, category, amount, t_date, 
         else:
             is_open = True
             msg_str = dbc.Alert("You must specify all values.", color="danger")
-    elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'description-input.value',
+    elif trigger in ['modal-category-dropdown.value', 'transaction-value-input.value', 'transaction-date.date', 'posted-date.date', 'description-input.value',
                      'modal-account-dropdown.value', 'modal-account-input.value', 'modal-category-input.value', 'note-input.value']:
         is_open = True
     else:

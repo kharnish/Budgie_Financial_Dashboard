@@ -93,7 +93,7 @@ def make_categories_table(check_update=False):
         elif col['field'] == 'category name':
             col['editable'] = True
         elif col['field'] == 'parent':
-            col['hide'] = True
+            col['editable'] = True
         elif col['field'] == 'hidden':
             col['editable'] = True
 
