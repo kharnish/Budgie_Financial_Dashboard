@@ -75,6 +75,9 @@ class MaintainDatabase:
             source = df['Funding Source'].replace({'Venmo balance': np.nan})
             if any(~source.isna()):
                 df['notes'] = 'Source: ' + source
+            # Add description if it's a transfer out of Venmo
+            for i in np.argwhere(df['Type'] == 'Standard Transfer'):
+                df.loc[i, 'description'] = f"Transfer to {df.loc[i, 'Destination'].values[0]}"
 
         # Standardize sheet columns
         df = df.dropna(axis='columns', how='all')

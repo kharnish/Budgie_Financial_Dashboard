@@ -234,9 +234,13 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
     else:
         date_range_style = {'display': 'none'}
 
-    # if one of the parameters, change them in the current dict
+    # If one of the parameters, change them in the current dict
     if trigger == 'field-dropdown.value':
         new_params['field_filter'] = field_filter
+        for filter in ['Category', 'Account Name']:
+            if filter not in field_filter:
+                new_params['filter_value'][filter] = []
+
     elif trigger == 'time-dropdown.value':
         new_params['time_filter'] = time_filter
         if time_filter == 'This Month':
@@ -270,6 +274,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
             date_range_style = {'display': 'none'}
         elif time_filter == 'Custom':
             date_range_style = {'display': 'inline-block', 'padding': '15px 20px 15px 20px'}
+
     elif 'date-range' in trigger:
         new_params['start_date'] = start_date
         new_params['end_date'] = end_date

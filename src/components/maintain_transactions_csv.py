@@ -79,7 +79,7 @@ class MaintainCSV(MaintainDatabase):
 
         try:
             self.transactions_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'transactions.csv')))
-            self.transactions_table['date'] = pd.to_datetime(self.transactions_table['date'])
+            self.transactions_table['posted_date'] = pd.to_datetime(self.transactions_table['posted_date'])
         except FileNotFoundError:
             self.transactions_table = BudgieDF(EMPTY_TRANSACTION)
 
@@ -121,10 +121,11 @@ class MaintainCSV(MaintainDatabase):
             if len(tables[i]) > 0:
                 tables[i].to_csv(os.path.join(self.file_dir, file_names[i]), index=False)
 
-    def add_one_transaction(self, category, amount, t_date, description, account, note):
+    def add_one_transaction(self, category, amount, t_date, p_date, description, account, note):
         """Add a single manual transaction to the dataframe"""
         transaction = {'_id': str(uuid.uuid4()),
-                       'date': [datetime.strptime(t_date, '%Y-%m-%d')],
+                       'posted date': [datetime.strptime(p_date, '%Y-%m-%d')],
+                       'transaction date': [datetime.strptime(t_date, '%Y-%m-%d')],
                        'category': [category],
                        'description': [description],
                        'amount': [amount],
@@ -146,7 +147,7 @@ class MaintainCSV(MaintainDatabase):
 
         self.autocategories = {}
         for i, row in k.iterrows():
-            self.autocategories[row['original description']] = {'category': row['category'], 'date': row['date']}
+            self.autocategories[row['original description']] = {'category': row['category'], 'posted date': row['posted date']}
 
     def query_transactions(self, conf_dict):
         """Query dataframe according to configuration dict parameters
@@ -156,11 +157,13 @@ class MaintainCSV(MaintainDatabase):
 
         Returns: Pandas Dataframe of transactions
         """
-        transactions = self.transactions_table[(self.transactions_table['date'] >= conf_dict['start_date']) & (self.transactions_table['date'] <= conf_dict['end_date'])]
+        transactions = self.transactions_table[(self.transactions_table['posted date'] >= conf_dict['start_date']) & (self.transactions_table['posted date'] <= conf_dict['end_date'])]
         if len(conf_dict['filter_value']) == 0:
             pass
         else:
-            transactions = transactions[transactions[conf_dict['field_filter'].lower()].isin(conf_dict['filter_value'])]
+            for val in conf_dict['field_filter']:
+                if len(conf_dict['filter_value'][val]) > 0:
+                    transactions = transactions[transactions[val.lower()].isin(conf_dict['filter_value'])]
 
         if len(transactions) == 0:
             transactions = EMPTY_TRANSACTION
@@ -168,11 +171,12 @@ class MaintainCSV(MaintainDatabase):
         return transactions
 
     def get_oldest_transaction(self):
-        return self.transactions_table['date'].min()
+        return self.transactions_table['posted_date'].min()
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
-        change_dict[0]['data']['date'] = datetime.strptime(change_dict[0]['data']['date'], '%m-%d-%Y')
+        change_dict[0]['data']['posted date'] = datetime.strptime(change_dict[0]['data']['posted date'], '%m-%d-%Y')
+        change_dict[0]['data']['transaction date'] = datetime.strptime(change_dict[0]['data']['transaction date'], '%m-%d-%Y')
         new_dict = change_dict[0]['data']
         tid = new_dict['_id']
         existing = self.transactions_table[self.transactions_table['_id'] == tid]
@@ -184,9 +188,11 @@ class MaintainCSV(MaintainDatabase):
         """Edit data for multiple transactions at one time"""
         for new_trans in transaction_list:
             try:
-                new_trans['date'] = datetime.strptime(new_trans['date'], '%Y-%m-%d')
+                new_trans['posted date'] = datetime.strptime(new_trans['posted date'], '%Y-%m-%d')
+                new_trans['transaction date'] = datetime.strptime(new_trans['transaction date'], '%Y-%m-%d')
             except ValueError:
-                new_trans['date'] = datetime.strptime(new_trans['date'], '%m-%d-%Y')
+                new_trans['posted date'] = datetime.strptime(new_trans['posted date'], '%m-%d-%Y')
+                new_trans['transaction date'] = datetime.strptime(new_trans['transaction date'], '%m-%d-%Y')
             tid = new_trans['_id']
             existing = self.transactions_table[self.transactions_table['_id'] == tid]
             for key, val in new_trans.items():
