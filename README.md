@@ -22,17 +22,17 @@ separated by account.
 Add a new account by selecting the "Add New Account..." option from the accounts drop down menu.
 Type the account name and instantiate that account by selecting a transaction CSV file from your financial institution to upload. 
 Once the account is logged in your database, you can upload more transactions CSV files under that account. 
-You can select multiple files to upload simultaneously for the same account.
+You can select multiple files at one time to upload simultaneously for the same account.
 
 You can also manually input transactions with the "Add Manual Transaction" menu.
 
-After the transactions are loaded, you can update their details in the "Transactions" tab either by double-clicking on the data or by selecting one or multiple rows
-and updating with the "Edit" button.
+After the transactions are loaded, you can update their details, such as category, in the "Transactions" tab either by double-clicking on the data or by selecting one or multiple rows and updating with the "Edit" button.
 
-Budgie will attempt to auto-categorize new transactions based on previous transactions with a similar description. 
+Budgie will attempt to auto-categorize new transactions based on previous transactions in that account with a similar description. 
 
-Once you categorize the transactions, you can add a budget and see your current status for different categories in the "Budget" tab
-and use the filters on the Configurations sidebar to look for trends in your finances.
+Once you categorize the transactions, you can add a budget and see your current status for different categories in the "Budget" tab and use the filters on the Configurations sidebar to look for trends in your finances.
+
+On each tab, click the Question Mark icon in the upper right for more details about that tab!
 
 
 

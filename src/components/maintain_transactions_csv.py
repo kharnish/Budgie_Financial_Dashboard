@@ -43,7 +43,11 @@ class BudgieDF(pd.DataFrame):
         try:
             vals_list.remove(np.nan)
         except ValueError:
-            pass
+            try:
+                if np.isnan(vals_list[0]):
+                    vals_list.remove(vals_list[0])
+            except (TypeError, IndexError):
+                pass
 
         return sorted(vals_list)
 
@@ -71,7 +75,7 @@ class MaintainCSV(MaintainDatabase):
             print('CSV Data Directory: ', self.file_dir)
         else:
             # we are running in a normal Python environment
-            load_dotenv()
+            # load_dotenv()
             self.file_dir = os.getenv("DATA_DIR")
 
         if not os.path.isdir(self.file_dir):
@@ -79,7 +83,8 @@ class MaintainCSV(MaintainDatabase):
 
         try:
             self.transactions_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'transactions.csv')))
-            self.transactions_table['posted_date'] = pd.to_datetime(self.transactions_table['posted_date'])
+            self.transactions_table['transaction date'] = pd.to_datetime(self.transactions_table['transaction date'])
+            self.transactions_table['posted date'] = pd.to_datetime(self.transactions_table['posted date'])
         except FileNotFoundError:
             self.transactions_table = BudgieDF(EMPTY_TRANSACTION)
 
@@ -94,7 +99,8 @@ class MaintainCSV(MaintainDatabase):
             self.accounts_table = BudgieDF()
 
         try:
-            self.categories_table = BudgieDF(pd.read_csv(os.path.join(self.file_dir, 'categories.csv')))
+            self.categories_table = pd.read_csv(os.path.join(self.file_dir, 'categories.csv'))
+            self.categories_table = BudgieDF(self.categories_table.replace(np.nan, ''))
         except FileNotFoundError:
             self.categories_table = BudgieDF()
 
@@ -171,7 +177,7 @@ class MaintainCSV(MaintainDatabase):
         return transactions
 
     def get_oldest_transaction(self):
-        return self.transactions_table['posted_date'].min()
+        return self.transactions_table['posted date'].min()
 
     def edit_transaction(self, change_dict):
         """Update transaction based on edits in Transaction table"""
@@ -217,10 +223,16 @@ class MaintainCSV(MaintainDatabase):
         if len(existing) == 1:
             self.budget_table.loc[existing.index, 'value'] = value
         else:
-            parent = self.categories_table.find_one({'category name': category})
+            is_parent = False
+            try:
+                self.categories_table[self.categories_table['parent'] == category]['parent'].values[0]
+                is_parent = True
+            except IndexError:
+                pass
+
             self.budget_table = BudgieDF(pd.concat([self.budget_table, pd.DataFrame({'category': [category],
                                                                                      'value': [value],
-                                                                                     'is_parent': True if parent is None else None,
+                                                                                     'is_parent': is_parent,
                                                                                      '_id': uuid.uuid4()})], ignore_index=True))
         self.update_parent_budget(category)
         self.export_data_to_csv()
@@ -300,18 +312,13 @@ class MaintainCSV(MaintainDatabase):
         self.export_data_to_csv()
 
     def delete_account(self, row_data):
-        """Delete account in database"""
-        rm_i = self.accounts_table[(self.accounts_table['_id'] == row_data['_id'])].index
-        print(rm_i)
-        # self.accounts_table = BudgieDF(self.accounts_table.drop(rm_i))
-
-        rm_t = self.query_transactions({'account name': row_data['account name']})
-        print(rm_t)
-
-        # rm_i = self.transactions_table[(self.accounts_table['_id'] == row_data['_id'])].index
+        """Delete account in database and remove all transactions"""
+        self.accounts_table = BudgieDF(self.accounts_table[self.accounts_table['account name'] != row_data['account name']])
+        self.transactions_table = BudgieDF(self.transactions_table[self.transactions_table['account name'] != row_data['account name']])
+        self.export_data_to_csv()
 
     """====== Category ======"""
-    def add_category(self, category_name, category_parent=None):
+    def add_category(self, category_name, category_parent=''):
         """Add new category in dataframe"""
         self.categories_table = BudgieDF(pd.concat([self.categories_table, pd.DataFrame({'parent': [category_parent],
                                                                                          'category name': [category_name],
@@ -320,12 +327,21 @@ class MaintainCSV(MaintainDatabase):
 
     def edit_category(self, change_dict):
         """Update category data based on edits in Categories table"""
-        new_dict = change_dict[0]['data']
+        new_dict = change_dict['data']
         tid = new_dict['_id']
         existing = self.categories_table[self.categories_table['_id'] == tid]
         for key, val in new_dict.items():
             self.categories_table.loc[existing.index, key] = new_dict[key]
         self.export_data_to_csv()
+
+    def get_children_categories_list(self, parent=None):
+        if isinstance(parent, list):
+            children = []
+            for par in parent:
+                children.extend([item['category name'] for item in list(self.categories_table.find({'parent': par}))])
+            return children
+        else:
+            return list(self.categories_table.find({'parent': parent})['category name'])
 
     def get_hide_from_trends(self):
         """Get list of all categories hidden from trends"""
@@ -333,9 +349,16 @@ class MaintainCSV(MaintainDatabase):
 
     def delete_category(self, row_data):
         """Delete category in database"""
-        pass
-        # rm_i = self.categories_table[(self.categories_table['_id'] == row_data['_id'])].index
-        # self.categories_table = BudgieDF(self.categories_table.drop(rm_i))
+        # Update transaction categories to unknown
+        self.transactions_table['category'] = self.transactions_table['category'].replace(row_data['category name'], 'unknown')
+
+        # Update budget
+        self.budget_table = BudgieDF(self.budget_table[self.budget_table['category'] != row_data['category name']])
+
+        # Remove category from table
+        rm_i = self.categories_table[self.categories_table['_id'] == row_data['_id']].index
+        self.categories_table = BudgieDF(self.categories_table.drop(rm_i))
+        self.export_data_to_csv()
 
 
 if __name__ == '__main__':

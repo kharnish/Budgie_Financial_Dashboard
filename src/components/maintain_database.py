@@ -352,7 +352,7 @@ class MaintainDatabase:
             self.budget_table.update_one({'category': category}, {"$set": {'value': value}})
         else:
             parent = self.categories_table.find_one({'category name': category})
-            self.budget_table.insert_one({'category': category, 'value': value, 'is_parent': True if parent is None else None})
+            self.budget_table.insert_one({'category': category, 'value': value, 'is_parent': True if parent != '' else False})
         self.update_parent_budget(category)
 
     def update_parent_budget(self, category):
@@ -449,7 +449,12 @@ class MaintainDatabase:
                 cat_list.extend(['Add new category...'])
             elif extra == 'parent':
                 cat_list = list(self.transactions_table.find().distinct('category'))
-                cat_list.extend(list(self.categories_table.find().distinct('parent')))
+                parents = list(self.categories_table.find().distinct('parent'))
+                try:
+                    parents.remove('')
+                except ValueError:
+                    pass
+                cat_list.extend(parents)
                 # Remove NANs to allow for sorting strings
                 try:
                     cat_list.remove(None)
@@ -458,11 +463,7 @@ class MaintainDatabase:
                 cat_list = sorted(cat_list)
             elif extra == 'parent_only':
                 cat_list = list(self.categories_table.find().distinct('parent'))
-                # Remove NANs to allow for sorting strings
-                try:
-                    cat_list.remove(None)
-                except ValueError:
-                    pass
+                cat_list.remove('')
                 cat_list = sorted(cat_list)
             else:
                 cat_list.extend(self.transactions_table.find().distinct('category'))
@@ -487,6 +488,7 @@ class MaintainDatabase:
     def delete_category(self, row_data):
         """Delete category in database"""
         self.transactions_table.update_many({'category': row_data['category name']}, {'$set': {'category': 'unknown'}})
+        # TODO add update to delete budget category
         if row_data['parent'] == '':
             row_data['parent'] = None
         row_data.pop('_id')
@@ -501,6 +503,7 @@ class MaintainDatabase:
         for coll in [self.transactions_table, self.budget_table, self.accounts_table, self.categories_table]:
             data = coll.find()
             this_data = pd.DataFrame(data)
+            # this_data = this_data.drop(columns=['_id'])
             this_data.to_csv(os.path.join(root, coll.name + '.csv'), index=False)
         return root
 
