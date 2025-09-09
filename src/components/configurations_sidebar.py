@@ -32,8 +32,7 @@ configurations_sidebar = html.Div(
                           children=['Category Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='cat-filter-dropdown', maxHeight=400, clearable=True,
-                                                 searchable=True, className='dropdown', multi=True,
-                                                 options=MD.get_categories_list('parent'),
+                                                 searchable=True, className='dropdown', multi=True, options=[],
                                                  )
                                     ]
                                    ),
@@ -43,8 +42,7 @@ configurations_sidebar = html.Div(
                           children=['Account Filter']),
                           html.Div(style={'width': '54%', 'display': 'inline-block', 'padding': '0 0 10px 0', 'vertical-align': 'middle'},
                           children=[dcc.Dropdown(id='acc-filter-dropdown', maxHeight=400, clearable=True,
-                                                 searchable=True, className='dropdown', multi=True,
-                                                 options=get_accounts_list(),
+                                                 searchable=True, className='dropdown', multi=True, options=[],
                                                  )
                                     ]
                                    ),
@@ -188,7 +186,9 @@ configurations_sidebar = html.Div(
 @callback(
     Output('current-config-memory', 'data'),
     Output('cat-row', 'style'),
+    Output('cat-filter-dropdown', 'options'),
     Output('acc-row', 'style'),
+    Output('acc-filter-dropdown', 'options'),
     Output('time-dropdown', 'value'),
     Output('sort-dropdown', 'value'),
     Output('date-range', 'style'),
@@ -302,7 +302,7 @@ def update_parameters(field_filter, time_filter, cat_filter, acc_filter, sort_fi
     if trigger == 'acc-filter-dropdown.value':
         new_params['filter_value']['Account Name'] = acc_filter
 
-    return new_params, cat_style, account_style, new_params['time_filter'], new_params['sort_filter'], date_range_style
+    return new_params, cat_style, MD.get_categories_list('parent'), account_style, get_accounts_list(), new_params['time_filter'], new_params['sort_filter'], date_range_style
 
 
 @callback(
@@ -488,7 +488,7 @@ def parse_upload_transaction_file(account, loaded_file, new_account):
                         if new_account:
                             MD.add_account(new_account)
                             MD.export_data_to_csv()
-                            new_account = None
+                            new_account = ''
                     account_dropdown_value = None
                 else:
                     # Give a second chance to upload the file

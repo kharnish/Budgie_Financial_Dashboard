@@ -82,7 +82,7 @@ def make_categories_table(check_update=False):
         return {'data': [{'Category Name': 'No categories'}], 'columns': [{"field": 'Category Name'}]}
 
     categories.loc[:, '_id'] = [str(tid) for tid in categories['_id']]
-    categories = categories.sort_values(['parent', 'category name'], key=lambda column: column.str.lower())
+    categories = categories.sort_values(by=['parent', 'category name'], ascending=[False, True], key=lambda column: column.str.lower())
     data = categories.to_dict('records')
     columns = [{"field": i} for i in categories.columns]
 
@@ -115,7 +115,7 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                                                             id="category-delete", disabled=True, color="danger")]),
                               dcc.ConfirmDialog(
                                     id='confirm-category-danger',
-                                    message='WARNING! \n\nYou are about to delete a category. All associated transactions will be reverted to "unknown" category. \n\nDo you want to continue?',
+                                    message='WARNING! \n\nYou are about to delete a category. All associated transactions will be reverted to "unknown" category and associated budget will be deleted. \n\nDo you want to continue?',
                               ),
                               dag.AgGrid(id="categories-table",
                                          style={"height": '600px'},
@@ -133,6 +133,7 @@ configurations_tab = dcc.Tab(label="Configurations", value='Configurations', chi
                               dbc.Modal(id="configuration-help", is_open=False, children=[
                                   dbc.ModalHeader(dbc.ModalTitle("Configuration Help")),
                                   dbc.ModalBody(children=['The Configurations tab shows all Categories and Accounts.', html.Br(), html.Br(),
+                                                          'A category can only exist if at least one transaction has that category. Edit the transactions in the Transaction tab to create a new category. Multiple categories can be grouped under the same Parent category, which is created by double-clicking the blank Parent space beside the desired category.', html.Br(), html.Br(),
                                                           "Categories can be marked as Hidden, which means those transactions won't be displayed on the Trends tab. "
                                                           'This is common for "Transfer" or "Credit Card Payment" categories where money is being moved from an account but not actually spent.',
                                                           html.Br(), html.Br(),

@@ -167,7 +167,7 @@ budget_tab = dcc.Tab(label="Budget", value='Budget', className='tab-body', child
                           children=[html.I(className="fa-solid fa-circle-question")]),
                  dbc.Modal(id="budget-help", is_open=False, children=[
                      dbc.ModalHeader(dbc.ModalTitle("Budget Help")),
-                     dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress.', html.Br(), html.Br(),
+                     dbc.ModalBody(children=['The Budget tab allows you to set budgets for each category and see your progress. Budgets can not be set for a Parent category- the budget is just the sum of all the children categories.', html.Br(), html.Br(),
                                              'Set a new category budget or update an exising budget with the Add or Update Budget button.', html.Br(), html.Br(),
                                              'The categories are split into Income and Spending budgets. The table below the budget graphs shows your total budgeted income vs spending.', html.Br(), html.Br(),
                                              'The thick line vertical shows your limit of 100% per category, while the thinner line shows how far through the month you are.', html.Br(), html.Br(),
@@ -294,9 +294,9 @@ def toggle_budget_modal(open_modal, cancel, submit, budget_category, budget_valu
                     'posted date': {'$gte': datetime.today() - timedelta(days=180),
                                     '$lte': datetime.today()},
                     'category': child_cat}))])
-            num_text = 'Budget group amount:'
+            num_text = 'Group budget amount:'
             input_disabled = True
-
+        
         # But if it's a single category, allow value input
         else:
             if bv != 0:
