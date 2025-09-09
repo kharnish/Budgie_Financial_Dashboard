@@ -63,9 +63,8 @@ class BudgieDF(pd.DataFrame):
 
 
 class MaintainCSV(MaintainDatabase):
-    def __init__(self):
+    def __init__(self, ):
         super().__init__()
-        self.file_dir = None if self.file_dir is None else self.file_dir
 
     def load_initial_data(self):
         # Get CSV file directory depending on if it's running from an executable bundle or regular environment

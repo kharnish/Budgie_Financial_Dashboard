@@ -157,6 +157,9 @@ don't worry about closing the command prompts when you're done, Mongo saves all 
 
 6. Now, you can run `app.py` and start using Budgie by uploading a transaction CSV file to a new account
 
+#### Compiling with PyInstaller
+Open command window and activate python environment. CD into `src` and run `pyinstaller Budgie.spec`.
+
 
 ### Slow performance
 I've only run the CSV file option with a couple thousand transactions (for me, about a handful of years worth transactions). Substantially larger amounts of data may experience slower performance,
